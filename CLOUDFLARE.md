@@ -4,7 +4,7 @@
 
 1. 打开 Cloudflare 控制台的 **Workers & Pages**。
 2. 选择 **Create application → Pages → Drag and drop**。
-3. 项目名可填写 `yuejing-new-world`。
+3. 项目名填写 `comparelist`。
 4. 上传项目根目录生成的 `悦景新世界-Cloudflare-Pages.zip`，或直接拖入 `cloudflare-dist` 文件夹。
 5. 点击部署，完成后会得到一个 `*.pages.dev` 地址。
 
