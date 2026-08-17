@@ -5,6 +5,8 @@
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
   Content-Security-Policy: default-src 'self'; img-src 'self' data: blob:; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'
   X-Robots-Tag: noindex, nofollow, noarchive
+
+/index.html
   Cache-Control: no-cache
 
 /app.js
@@ -14,10 +16,10 @@
   Cache-Control: public, max-age=0, must-revalidate
 
 /products/*
-  Cache-Control: public, max-age=86400
+  Cache-Control: public, max-age=604800
 
 /renovation/*
-  Cache-Control: public, max-age=86400
+  Cache-Control: public, max-age=604800
 
 /docs/*
   Cache-Control: public, max-age=86400
