@@ -1,0 +1,23 @@
+/*
+  X-Frame-Options: SAMEORIGIN
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+  Content-Security-Policy: default-src 'self'; img-src 'self' data: blob:; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'self'; form-action 'self'
+  X-Robots-Tag: noindex, nofollow, noarchive
+  Cache-Control: no-cache
+
+/app.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+/app.css
+  Cache-Control: public, max-age=0, must-revalidate
+
+/products/*
+  Cache-Control: public, max-age=86400
+
+/renovation/*
+  Cache-Control: public, max-age=86400
+
+/docs/*
+  Cache-Control: public, max-age=86400
