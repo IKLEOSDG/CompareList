@@ -24,6 +24,9 @@ type Product = {
 type PlanItem = { qty: number; unitPrice: number };
 type Plan = { id: string; name: string; items: Record<string, PlanItem> };
 
+const optimizedImage = (path: string) =>
+  /^(products|renovation)\//.test(path) ? path.replace(/\.(png|jpe?g)$/i, ".webp") : path;
+
 const seedProducts: Product[] = [
   {
     id: "fridge487",
@@ -758,8 +761,10 @@ export default function Home() {
               <article className="card" key={p.id}>
                 <div className="image-wrap">
                   <img
-                    src={p.image}
+                    src={optimizedImage(p.image)}
                     alt={`${p.brand} ${p.model}`}
+                    loading="lazy"
+                    decoding="async"
                     onError={(e) => {
                       e.currentTarget.src = "og.png";
                     }}
@@ -850,7 +855,7 @@ export default function Home() {
               if (!p) return null;
               return (
                 <div className="quote-item" key={id}>
-                  <img src={p.image} alt="" />
+                  <img src={optimizedImage(p.image)} alt="" loading="lazy" decoding="async" />
                   <div className="qi-main">
                     <b>{p.name}</b>
                     <span>{p.model}</span>
@@ -997,7 +1002,7 @@ export default function Home() {
               <b>项目</b>
               {compareProducts.map((p) => (
                 <div key={p.id}>
-                  <img src={p.image} alt="" />
+                  <img src={optimizedImage(p.image)} alt="" loading="lazy" decoding="async" />
                   <strong>
                     {p.brand} {p.name}
                   </strong>
