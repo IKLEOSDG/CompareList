@@ -22,6 +22,18 @@ npx wrangler login
 npm run deploy:cloudflare
 ```
 
+## GitHub 自动部署（当前模式）
+
+Cloudflare Pages 已连接 `IKLEOSDG/CompareList`。构建设置填写：
+
+- 构建命令：`npm run build`
+- 构建输出目录：`cloudflare-dist`
+- 根目录：留空
+- 生产分支：`main`
+- 启动命令：留空
+
+以后只要把更新推送到 GitHub 的 `main` 分支，Cloudflare 就会自动重新构建并发布。
+
 ## 数据与隐私
 
 - 本站没有服务器数据库，愿望单、门款价格、自定义候选和本地资料均保存在当前浏览器。
