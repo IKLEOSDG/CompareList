@@ -4,17 +4,20 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import ApplianceStudio from "./ApplianceStudio";
 import { fileToDataUrl, listRecords, LocalRecord, removeRecord, saveRecord } from "./localDb";
 
-type Section = "home" | "smart" | "appliances" | "design" | "materials" | "doors" | "budget" | "documents";
-type Candidate = { id: string; category: string; brand: string; name: string; model: string; size: string; price: number; image: string; note: string };
+type Section = "home" | "smart" | "appliances" | "design" | "materials" | "furniture" | "customization" | "doors" | "budget" | "documents";
+type Candidate = { id: string; category: string; brand: string; name: string; model: string; size: string; install?: string; price: number; image: string; note: string; url?: string };
+type QuoteRow = { id: string; category: string; name: string; detail: string; value: number };
 
 const sections: { id: Section; no: string; title: string; short: string; stat: string }[] = [
   { id: "smart", no: "01", title: "全屋智能", short: "场景、点位、风险与验收", stat: "6 类系统" },
   { id: "appliances", no: "02", title: "家电选型", short: "多套方案对比与统一报价", stat: "25 件候选" },
   { id: "design", no: "03", title: "设计图纸", short: "户型、铺贴、厨房与立面", stat: "9 张图纸" },
-  { id: "materials", no: "04", title: "主材家具", short: "瓷砖、地板、沙发与软装", stat: "可持续添加" },
-  { id: "doors", no: "05", title: "门窗系统", short: "入户门、室内门与洞口", stat: "8 款候选" },
-  { id: "budget", no: "06", title: "预算台账", short: "按空间、品类与方案汇总", stat: "动态计算" },
-  { id: "documents", no: "07", title: "施工资料", short: "交底、安装、验收与合同", stat: "本地归档" },
+  { id: "materials", no: "04", title: "主材选型", short: "瓷砖、地板、石材、卫浴与五金", stat: "独立候选库" },
+  { id: "furniture", no: "05", title: "家具软装", short: "沙发、床垫、餐桌椅与成品柜", stat: "独立候选库" },
+  { id: "customization", no: "06", title: "全屋定制", short: "橱柜、衣柜、木作与柜体报价", stat: "独立候选库" },
+  { id: "doors", no: "07", title: "门窗系统", short: "入户门、室内门与洞口", stat: "8 款候选" },
+  { id: "budget", no: "08", title: "预算台账", short: "按空间、品类与方案汇总", stat: "动态计算" },
+  { id: "documents", no: "09", title: "施工资料", short: "交底、安装、验收与合同", stat: "本地归档" },
 ];
 
 const doors: Candidate[] = [
@@ -42,8 +45,8 @@ const drawings = [
 
 const tileCandidates: Candidate[] = [
   { id: "greatwall", category: "室内通铺", brand: "长城瓷砖", name: "厅卧室地面铺贴方案", model: "方案 1–4", size: "产品规格待清单确认", price: 0, image: "renovation/drawings/flooring-1.png", note: "四种排版方案已录入图纸区；价格、型号和损耗率待补。" },
-  { id: "limosi", category: "主卫生间", brand: "爱力蒙特", name: "利莫斯墙地砖组合", model: "C56131RD / C56131Y/J", size: "600 × 1350 mm", price: 6838, image: "renovation/tiles/bathroom-quote.png", note: "墙面25片、花片8片、地面9片。历史最终意向为淋浴背墙与坐便背墙连续铺花纹，其余墙面及地面用莱姆石素砖；需核对8片花片是否足够覆盖完整背景墙。" },
-  { id: "ayers", category: "次卫生间", brand: "爱力蒙特", name: "艾尔斯岩石墙地砖组合", model: "C56211R", size: "600 × 1350 mm", price: 3816, image: "renovation/drawings/bathroom-option-b.jpg", note: "墙面16片、地面8片；加工费按实际发生收取。" },
+  { id: "limosi", category: "主卫生间", brand: "爱力蒙特", name: "利莫斯墙地砖组合", model: "C56131RD / C56131Y/J", size: "600 × 1350 mm", price: 0, image: "renovation/tiles/bathroom-quote.png", note: "历史备选：墙面25片、花片8片、地面9片。不会自动计价；若重新考虑该品牌，请按最终复尺和实际报价补录。" },
+  { id: "ayers", category: "次卫生间", brand: "爱力蒙特", name: "艾尔斯岩石墙地砖组合", model: "C56211R", size: "600 × 1350 mm", price: 0, image: "renovation/drawings/bathroom-option-b.jpg", note: "历史备选：墙面16片、地面8片；不会自动计价，加工费按实际发生补录。" },
 ];
 
 const documents = [
@@ -61,71 +64,64 @@ const optimizedImage = (path: string) =>
   /^(products|renovation)\//.test(path) ? path.replace(/\.(png|jpe?g)$/i, ".webp") : path;
 const readSection = (): Section => {
   const hash = location.hash.replace("#", "") as Section;
-  return ["smart", "appliances", "design", "materials", "doors", "budget", "documents"].includes(hash) ? hash : "home";
+  return ["smart", "appliances", "design", "materials", "furniture", "customization", "doors", "budget", "documents"].includes(hash) ? hash : "home";
 };
 
 export default function PortalApp() {
   const [section, setSection] = useState<Section>("home");
   const [selected, setSelected] = useState<string[]>([]);
-  const [doorPrices, setDoorPrices] = useState<Record<string, number>>({});
+  const [itemPrices, setItemPrices] = useState<Record<string, number>>({});
   const [customItems, setCustomItems] = useState<LocalRecord[]>([]);
   const [localDocs, setLocalDocs] = useState<LocalRecord[]>([]);
-  const [included, setIncluded] = useState<Record<string, boolean>>({ appliances: true, bathroom: true, smart: false, custom: true, doors: true });
-  const [applianceTotal, setApplianceTotal] = useState(27830);
+  const [applianceTotal, setApplianceTotal] = useState(0);
 
   useEffect(() => {
     const update = () => { setSection(readSection()); scrollTo({ top: 0 }); };
+    const updateApplianceTotal = (event: Event) => setApplianceTotal(Number((event as CustomEvent<{ total: number }>).detail?.total || 0));
     update(); addEventListener("hashchange", update);
+    addEventListener("home-select-updated", updateApplianceTotal);
     try {
-      setSelected(JSON.parse(localStorage.getItem("yj-selected-v1") || "[]"));
-      setDoorPrices(JSON.parse(localStorage.getItem("yj-door-prices-v1") || "{}"));
-      setIncluded({ ...included, ...JSON.parse(localStorage.getItem("yj-budget-v1") || "{}") });
-      const appliance = JSON.parse(localStorage.getItem("home-select-v1") || "null");
+      setSelected(JSON.parse(localStorage.getItem("yj-selected-v2") || "[]"));
+      setItemPrices(JSON.parse(localStorage.getItem("yj-item-prices-v2") || "{}"));
+      const appliance = JSON.parse(localStorage.getItem("home-select-v2") || "null");
       const plan = appliance?.plans?.find((p: { id: string }) => p.id === appliance.activePlanId) || appliance?.plans?.[0];
       if (plan?.items) setApplianceTotal(Object.values(plan.items as Record<string, { qty: number; unitPrice: number }>).reduce((sum, item) => sum + item.qty * item.unitPrice, 0));
     } catch {}
     listRecords("candidate").then(setCustomItems).catch(() => undefined);
     listRecords("document").then(setLocalDocs).catch(() => undefined);
-    return () => removeEventListener("hashchange", update);
+    return () => { removeEventListener("hashchange", update); removeEventListener("home-select-updated", updateApplianceTotal); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const toggleSelected = (id: string) => setSelected((current) => {
     const next = current.includes(id) ? current.filter((x) => x !== id) : [...current, id];
-    localStorage.setItem("yj-selected-v1", JSON.stringify(next)); return next;
+    localStorage.setItem("yj-selected-v2", JSON.stringify(next)); return next;
   });
-  const updateDoorPrice = (id: string, price: number) => setDoorPrices((current) => {
-    const next = { ...current, [id]: price }; localStorage.setItem("yj-door-prices-v1", JSON.stringify(next)); return next;
-  });
-  const updateIncluded = (id: string) => setIncluded((current) => {
-    const next = { ...current, [id]: !current[id] }; localStorage.setItem("yj-budget-v1", JSON.stringify(next)); return next;
+  const updateItemPrice = (id: string, price: number) => setItemPrices((current) => {
+    const next = { ...current, [id]: price }; localStorage.setItem("yj-item-prices-v2", JSON.stringify(next)); return next;
   });
 
   const selectedDoors = doors.filter((item) => selected.includes(item.id));
   const selectedTiles = tileCandidates.filter((item) => selected.includes(item.id));
   const selectedCustom = customItems.filter((item) => selected.includes(item.id));
-  const doorTotal = selectedDoors.reduce((sum, item) => sum + (doorPrices[item.id] || 0), 0);
-  const tileTotal = selectedTiles.reduce((sum, item) => sum + item.price, 0);
-  const customTotal = selectedCustom.reduce((sum, item) => sum + (item.price || 0), 0);
-  const quoteRows = [
-    { id: "appliances", name: "家电当前方案", detail: "读取家电选型台当前愿望单", value: applianceTotal },
-    { id: "bathroom", name: "主次卫瓷砖", detail: "爱力蒙特调整后特批报价", value: 10654 },
-    { id: "smart", name: "全屋智能原方案", detail: "设备31,990 + 安装调试4,798.50，待优化", value: 36788.5 },
-    { id: "doors", name: "已选门款", detail: `${selectedDoors.length} 款，价格可在门窗分区补录`, value: doorTotal },
-    { id: "custom", name: "其他已选主材/家具", detail: `${selectedTiles.length + selectedCustom.length} 项`, value: tileTotal + customTotal },
+  const selectedAll = [...selectedDoors, ...selectedTiles, ...selectedCustom];
+  const quoteRows: QuoteRow[] = [
+    ...(applianceTotal ? [{ id: "appliances", category: "家电", name: "家电当前愿望单", detail: "读取家电选型台当前方案", value: applianceTotal }] : []),
+    ...selectedAll.map((item) => ({ id: item.id, category: item.category || "其他", name: `${item.brand || ""} ${item.name}`.trim(), detail: item.model || "型号待补", value: itemPrices[item.id] ?? item.price ?? 0 })),
   ];
-  const grandTotal = quoteRows.filter((row) => included[row.id]).reduce((sum, row) => sum + row.value, 0);
 
   return (
     <main className="yj-app">
       <Topbar section={section} />
       {section === "home" && <HomePage />}
-      {section === "smart" && <SmartPage />}
+      {section === "smart" && <SmartChoicePage />}
       {section === "appliances" && <div className="yj-appliance-wrap"><ApplianceStudio /></div>}
       {section === "design" && <DesignPage />}
-      {section === "materials" && <MaterialsPage selected={selected} toggle={toggleSelected} customItems={customItems} onChange={setCustomItems} />}
-      {section === "doors" && <DoorsPage selected={selected} toggle={toggleSelected} prices={doorPrices} setPrice={updateDoorPrice} />}
-      {section === "budget" && <BudgetPage rows={quoteRows} included={included} toggle={updateIncluded} total={grandTotal} selected={[...selectedDoors, ...selectedTiles, ...selectedCustom]} doorPrices={doorPrices} />}
+      {section === "materials" && <CollectionPage kind="materials" title="主材选型" eyebrow="MATERIAL LIBRARY" lead="瓷砖、地板、石材、墙面、卫浴与五金独立比较；历史报价只作为候选，不代表已经选定。" presets={tileCandidates} categories={["瓷砖", "地板", "石材", "墙面材料", "卫浴", "五金", "灯具", "窗帘", "其他主材"]} selected={selected} toggle={toggleSelected} prices={itemPrices} setPrice={updateItemPrice} customItems={customItems} onChange={setCustomItems} />}
+      {section === "furniture" && <CollectionPage kind="furniture" title="家具软装" eyebrow="FURNITURE & DECOR" lead="沙发、床垫、餐桌椅、成品柜和软装分别记录尺寸、摆位与到家价。" presets={[]} categories={["沙发", "床 / 床垫", "餐桌椅", "茶几 / 边几", "成品柜", "书桌 / 椅", "户外家具", "其他家具"]} selected={selected} toggle={toggleSelected} prices={itemPrices} setPrice={updateItemPrice} customItems={customItems} onChange={setCustomItems} />}
+      {section === "customization" && <CollectionPage kind="customization" title="全屋定制" eyebrow="WHOLE-HOME CUSTOMIZATION" lead="橱柜、衣柜与木作按投影面积、展开面积或整单分别报价，记录板材、五金和安装范围。" presets={[]} categories={["橱柜", "玄关柜", "电视柜", "衣柜", "书柜", "浴室柜", "阳台柜", "护墙 / 木作", "其他定制"]} selected={selected} toggle={toggleSelected} prices={itemPrices} setPrice={updateItemPrice} customItems={customItems} onChange={setCustomItems} />}
+      {section === "doors" && <DoorsPage selected={selected} toggle={toggleSelected} prices={itemPrices} setPrice={updateItemPrice} />}
+      {section === "budget" && <BudgetPage rows={quoteRows} />}
       {section === "documents" && <DocumentsPage records={localDocs} onChange={setLocalDocs} />}
       <MobileNav section={section} />
     </main>
@@ -137,7 +133,7 @@ function Topbar({ section }: { section: Section }) {
 }
 
 function MobileNav({ section }: { section: Section }) {
-  return <nav className="yj-mobile-nav" aria-label="手机端主导航"><a className={section === "home" ? "active" : ""} href="#home">首页</a><a className={section === "smart" ? "active" : ""} href="#smart">智能</a><a className={section === "appliances" ? "active" : ""} href="#appliances">家电</a><a className={section === "design" ? "active" : ""} href="#design">图纸</a><a className={section === "materials" ? "active" : ""} href="#materials">选材</a><a className={section === "doors" ? "active" : ""} href="#doors">门</a><a className={section === "budget" ? "active" : ""} href="#budget">预算</a><a className={section === "documents" ? "active" : ""} href="#documents">资料</a></nav>;
+  return <nav className="yj-mobile-nav" aria-label="手机端主导航"><a className={section === "home" ? "active" : ""} href="#home">首页</a><a className={section === "smart" ? "active" : ""} href="#smart">智能</a><a className={section === "appliances" ? "active" : ""} href="#appliances">家电</a><a className={section === "design" ? "active" : ""} href="#design">图纸</a><a className={section === "materials" ? "active" : ""} href="#materials">主材</a><a className={section === "furniture" ? "active" : ""} href="#furniture">家具</a><a className={section === "customization" ? "active" : ""} href="#customization">定制</a><a className={section === "doors" ? "active" : ""} href="#doors">门</a><a className={section === "budget" ? "active" : ""} href="#budget">预算</a><a className={section === "documents" ? "active" : ""} href="#documents">资料</a></nav>;
 }
 
 function PageHead({ eyebrow, title, lead }: { eyebrow: string; title: string; lead: string }) {
@@ -146,10 +142,15 @@ function PageHead({ eyebrow, title, lead }: { eyebrow: string; title: string; le
 
 function HomePage() {
   return <>
-    <section className="yj-hero"><div><p className="yj-eyebrow">HOME RENOVATION ARCHIVE · 2026</p><h1>把一个家的所有选择，<br /><em>放进同一张图里。</em></h1><p className="yj-lead">从户型、灯光和全屋智能，到家电、瓷砖、门与未来的沙发，每一次对比、报价和安装尺寸都在这里持续沉淀。</p><div className="yj-actions"><a className="primary" href="#design">先看设计图纸</a><a href="#appliances">打开家电选型台</a></div><dl className="yj-facts"><div><dt>风格</dt><dd>暖白 · 克制 · 低眩光</dd></div><div><dt>重点</dt><dd>调光 / 尺寸 / 收口 / 验收</dd></div><div><dt>存储</dt><dd>本机浏览器 · 可离线</dd></div></dl></div><figure className="yj-plan-card"><img src="renovation/drawings/floor-plan-color.webp" alt="悦景新世界彩色家具布置图" decoding="async" fetchPriority="high" /><figcaption><span>MASTER PLAN</span><b>悦景新世界 20-1-19-1</b><small>总平面 · 17638 × 12468 mm</small></figcaption></figure></section>
+    <section className="yj-hero"><div><p className="yj-eyebrow">HOME RENOVATION ARCHIVE · 2026</p><h1>把一个家的所有选择，<br /><em>放进同一张图里。</em></h1><p className="yj-lead">从户型、灯光和全屋智能，到家电、主材、家具、全屋定制与门窗，每一次对比、报价和安装尺寸都在这里持续沉淀。</p><div className="yj-actions"><a className="primary" href="#design">先看设计图纸</a><a href="#appliances">打开家电选型台</a></div><dl className="yj-facts"><div><dt>风格</dt><dd>暖白 · 克制 · 低眩光</dd></div><div><dt>重点</dt><dd>调光 / 尺寸 / 收口 / 验收</dd></div><div><dt>存储</dt><dd>本机浏览器 · 可离线</dd></div></dl></div><figure className="yj-plan-card"><img src="renovation/drawings/floor-plan-color.webp" alt="悦景新世界彩色家具布置图" decoding="async" fetchPriority="high" /><figcaption><span>MASTER PLAN</span><b>悦景新世界 20-1-19-1</b><small>总平面 · 17638 × 12468 mm</small></figcaption></figure></section>
     <section className="yj-section yj-index"><div className="yj-section-title"><p>PROJECT INDEX</p><h2>项目分区</h2><span>每个分区独立管理，最终统一汇总预算</span></div><div className="yj-module-grid">{sections.map((item) => <a key={item.id} href={`#${item.id}`}><span>{item.no}</span><div><h3>{item.title}</h3><p>{item.short}</p></div><small>{item.stat}</small><b>↗</b></a>)}</div></section>
     <section className="yj-focus"><article><p>当前设计重点</p><h2>四个重点调光区，<br />一个统一控制入口。</h2><ul><li>客厅 / 餐桌 / 主卧 / 书房分路调光</li><li>卫生间低位夜灯 + 静止存在感应</li><li>墙面按键优先，断网仍可用基础场景</li></ul></article><aside><span>下一步优先级</span><h3>先锁定回路、门洞和设备尺寸，再签主材。</h3><p>补齐逐路灯光表、PoE端口功率、门洞复尺、瓷砖排版和电器安装预留。</p></aside></section>
   </>;
+}
+
+function SmartChoicePage() {
+  const systems = [["控制与面板","网关、实体场景面板、智能开关与断网可用性"],["灯光调光","客厅、餐桌、主卧、书房按回路与驱动重新核对"],["智能遮阳","窗帘电机、轨道尺寸、电机侧和检修条件"],["全宅网络","PoE 路由、AP 数量、端口与供电功率"],["安防感知","水浸、燃气、人体与静止存在传感器"],["空调 / 新风联动","中央空调、新风、地暖接口协议和本地控制"]];
+  return <div className="yj-page"><PageHead eyebrow="WHOLE-HOME INTELLIGENCE" title="全屋智能" lead="当前生态与供应商均未确定。这里保存候选方案、点位和验收条款，不代表采用三翼鸟。" /><section className="yj-smart-overview"><div><span>历史候选报价</span><strong>¥36,788.50</strong><small>仅供比较，不自动进入预算</small></div><div><span>候选生态</span><strong>开放</strong><small>米家 / 三翼鸟 / 其他方案均可继续比较</small></div><div><span>先行条件</span><strong>布线</strong><small>零线、深底盒、网线、干接点与检修口</small></div></section><div className="yj-drawing-note"><b>生态尚未选定</b><span>大型家电按产品力独立选择，不为统一品牌强行接入。供应商和协议确认后，再把最终合同金额手工加入预算台账。</span></div><section className="yj-card-grid yj-system-grid">{systems.map(([title, text], index) => <article key={title}><span>0{index + 1}</span><h3>{title}</h3><p>{text}</p></article>)}</section><section className="yj-split"><article><p className="yj-kicker">SCENES</p><h2>场景候选</h2><div className="yj-scene-list">{[["日常","3000K · 主灯60–70%"],["会客","重点光70% · 人脸清晰"],["观影","背景光10–15% · 避免全黑"],["用餐","餐桌65–80% · 周边略暗"],["睡前","2700K · 3–5秒渐暗"],["起夜","低位照明1–8%"]].map(([a,b]) => <div key={a}><b>{a}</b><span>{b}</span></div>)}</div></article><aside className="yj-risk"><p className="yj-kicker">BEFORE CONTRACT</p><h2>签单前确认</h2><ol><li><b>系统边界</b><span>明确谁负责设备、布线、调试和售后。</span></li><li><b>回路与协议</b><span>逐路列功率、驱动、协议和墙面按键。</span></li><li><b>网络容量</b><span>提交 AP、PoE 端口及功率计算。</span></li><li><b>联动验收</b><span>断网、本地控制、静止存在和异常告警逐项测试。</span></li></ol></aside></section><div className="yj-download-row"><a href="docs/智能方案评审.docx">下载方案评审</a><a href="docs/灯光设计指导.docx">下载灯光指导</a><a href="docs/全屋智能方案.pptx">查看历史候选方案</a></div></div>;
 }
 
 function SmartPage() {
@@ -166,26 +167,49 @@ function DesignPage() {
 }
 
 function CandidateCard({ item, selected, toggle, priceEditor }: { item: Candidate; selected: boolean; toggle: () => void; priceEditor?: React.ReactNode }) {
-  return <article className={`yj-candidate ${selected ? "selected" : ""}`}><div className="yj-candidate-image"><img src={optimizedImage(item.image)} alt={`${item.brand} ${item.name}`} loading="lazy" decoding="async" /><span>{item.category}</span></div><div className="yj-candidate-body"><small>{item.brand}</small><h3>{item.name}</h3><b>{item.model}</b><dl><div><dt>尺寸/洞口</dt><dd>{item.size}</dd></div><div><dt>参考价</dt><dd>{item.price ? money(item.price) : "待补"}</dd></div></dl><p>{item.note}</p>{priceEditor}<button onClick={toggle}>{selected ? "✓ 已加入愿望单" : "+ 加入愿望单"}</button></div></article>;
+  const [detail, setDetail] = useState(false);
+  return <><article className={`yj-candidate ${selected ? "selected" : ""}`}><button className="yj-candidate-image" onClick={() => setDetail(true)}><img src={optimizedImage(item.image)} alt={`${item.brand} ${item.name}`} loading="lazy" decoding="async" /><span>{item.category}</span></button><div className="yj-candidate-body"><small>{item.brand}</small><h3>{item.name}</h3><b>{item.model}</b><dl><div><dt>产品尺寸 / 洞口</dt><dd>{item.size || "待补"}</dd></div><div><dt>安装尺寸 / 预留</dt><dd>{item.install || "待现场复尺"}</dd></div></dl>{priceEditor}<button className="yj-detail-button" onClick={() => setDetail(true)}>查看说明与大图 →</button><button onClick={toggle}>{selected ? "✓ 已加入愿望单" : "+ 加入愿望单"}</button></div></article>{detail && <Modal title={`${item.brand} · ${item.name}`} close={() => setDetail(false)}><div className="yj-product-detail"><img src={optimizedImage(item.image)} alt={`${item.brand} ${item.name}`} /><dl><div><dt>型号</dt><dd>{item.model}</dd></div><div><dt>产品尺寸 / 洞口</dt><dd>{item.size || "待补"}</dd></div><div><dt>安装尺寸 / 预留</dt><dd>{item.install || "待现场复尺"}</dd></div><div><dt>当前价格</dt><dd>{item.price ? money(item.price) : "待补"}</dd></div></dl><p>{item.note || "详细说明待补充。"}</p>{item.url && <a href={item.url} target="_blank" rel="noreferrer">打开商品 / 购买链接 ↗</a>}</div></Modal>}</>;
 }
 
-function MaterialsPage({ selected, toggle, customItems, onChange }: { selected: string[]; toggle: (id: string) => void; customItems: LocalRecord[]; onChange: (items: LocalRecord[]) => void }) {
+function CollectionPage({ kind, title, eyebrow, lead, presets, categories, selected, toggle, prices, setPrice, customItems, onChange }: { kind: "materials" | "furniture" | "customization"; title: string; eyebrow: string; lead: string; presets: Candidate[]; categories: string[]; selected: string[]; toggle: (id: string) => void; prices: Record<string, number>; setPrice: (id: string, price: number) => void; customItems: LocalRecord[]; onChange: (items: LocalRecord[]) => void }) {
   const [showForm, setShowForm] = useState(false);
+  const ownItems = customItems.filter((item) => item.id.startsWith(`${kind}-`));
   const addItem = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault(); const form = new FormData(event.currentTarget); const file = form.get("image") as File;
-    const record: LocalRecord = { id: `custom-${Date.now()}`, kind: "candidate", name: String(form.get("name") || "未命名候选"), category: String(form.get("category") || "其他"), brand: String(form.get("brand") || ""), model: String(form.get("model") || ""), size: String(form.get("size") || ""), price: Number(form.get("price") || 0), note: String(form.get("note") || ""), dataUrl: file?.size ? await fileToDataUrl(file) : "", createdAt: Date.now() };
+    const record: LocalRecord = { id: `${kind}-${Date.now()}`, kind: "candidate", name: String(form.get("name") || "未命名候选"), category: String(form.get("category") || "其他"), brand: String(form.get("brand") || ""), model: String(form.get("model") || ""), size: String(form.get("size") || ""), install: String(form.get("install") || ""), price: Number(form.get("price") || 0), note: String(form.get("note") || ""), url: String(form.get("url") || ""), dataUrl: file?.size ? await fileToDataUrl(file) : "", createdAt: Date.now() };
     await saveRecord(record); onChange([record, ...customItems]); setShowForm(false); event.currentTarget.reset();
   };
   const deleteItem = async (id: string) => { await removeRecord(id); onChange(customItems.filter((item) => item.id !== id)); };
-  return <div className="yj-page"><PageHead eyebrow="MATERIAL & FURNITURE LIBRARY" title="主材家具" lead="先收集、再对比、后入选。未来的沙发、床垫、餐桌、灯具和卫浴都能继续加进来。" /><section className="yj-material-hero"><div><img src="renovation/tile-living-room.webp" alt="客厅地砖同光影对比" loading="lazy" decoding="async" /></div><article><p className="yj-kicker">TILE STUDY</p><h2>公共区域：长城瓷砖铺贴方案</h2><p>四套厅卧室通铺排版已放入图纸区。除了看单片纹理，更要比较对缝、窄条、走廊连续性、家具遮挡和切割损耗。</p><a href="#design">查看 4 套铺贴图 →</a></article></section><div className="yj-drawing-note"><b>主卫方案与报价核对</b><span>设计意向是淋浴背墙与坐便背墙整面连续铺竖向花纹，其余墙面及地面使用同色莱姆石素砖并采用哑光防滑地面。最新报价仅列8片花片，施工前必须按立面净尺寸核算覆盖片数、裁切和损耗，避免设计与报价不一致。</span></div><div className="yj-section-bar"><div><h2>已录入候选</h2><span>主次卫调整后特批合计 ¥10,654</span></div><button onClick={() => setShowForm(true)}>+ 添加沙发 / 主材 / 家具</button></div><section className="yj-candidate-grid">{tileCandidates.map((item) => <CandidateCard key={item.id} item={item} selected={selected.includes(item.id)} toggle={() => toggle(item.id)} />)}{customItems.map((item) => <article className={`yj-candidate ${selected.includes(item.id) ? "selected" : ""}`} key={item.id}><div className="yj-candidate-image">{item.dataUrl ? <img src={item.dataUrl} alt={item.name} loading="lazy" decoding="async" /> : <div className="yj-image-placeholder">NO IMAGE</div>}<span>{item.category}</span></div><div className="yj-candidate-body"><small>{item.brand || "用户添加"}</small><h3>{item.name}</h3><b>{item.model || "型号待补"}</b><dl><div><dt>尺寸</dt><dd>{item.size || "待补"}</dd></div><div><dt>价格</dt><dd>{item.price ? money(item.price) : "待补"}</dd></div></dl><p>{item.note}</p><div className="yj-card-actions"><button onClick={() => toggle(item.id)}>{selected.includes(item.id) ? "✓ 已加入" : "+ 加入愿望单"}</button><button className="danger" onClick={() => deleteItem(item.id)}>删除</button></div></div></article>)}</section>{showForm && <Modal title="添加家装候选" close={() => setShowForm(false)}><form className="yj-form" onSubmit={addItem}><label>品类<select name="category" defaultValue="沙发"><option>沙发</option><option>床垫</option><option>餐桌椅</option><option>地板</option><option>瓷砖</option><option>灯具</option><option>卫浴</option><option>五金</option><option>窗帘</option><option>其他</option></select></label><label>名称<input name="name" required /></label><label>品牌<input name="brand" /></label><label>型号<input name="model" /></label><label>尺寸<input name="size" placeholder="长 × 宽 × 高 mm" /></label><label>价格<input name="price" type="number" min="0" /></label><label className="wide">图片<input name="image" type="file" accept="image/*" /></label><label className="wide">备注<textarea name="note" rows={3} /></label><div className="wide yj-form-actions"><button type="button" onClick={() => setShowForm(false)}>取消</button><button type="submit">保存候选</button></div></form></Modal>}</div>;
+  return <div className="yj-page"><PageHead eyebrow={eyebrow} title={title} lead={lead} />{kind === "materials" && <section className="yj-material-hero"><div><img src="renovation/tile-living-room.webp" alt="客厅地砖光影参考" loading="lazy" decoding="async" /></div><article><p className="yj-kicker">HISTORICAL OPTION</p><h2>瓷砖方案仅作为历史候选</h2><p>长城与爱力蒙特都不会自动进入预算。你可以继续添加其他品牌，主动加入愿望单后再填写实际到手价。</p><a href="#design">查看铺贴图 →</a></article></section>}<div className="yj-section-bar"><div><h2>候选清单</h2><span>只有主动加入的项目才进入预算</span></div><button onClick={() => setShowForm(true)}>+ 添加{title}候选</button></div><section className="yj-candidate-grid">{presets.map((item) => <CandidateCard key={item.id} item={{ ...item, price: prices[item.id] ?? 0 }} selected={selected.includes(item.id)} toggle={() => toggle(item.id)} priceEditor={<label className="yj-price-input">实际到手价 ¥<input value={prices[item.id] || ""} onChange={(e) => setPrice(item.id, Number(e.target.value))} type="number" min="0" placeholder="不预设" /></label>} />)}{ownItems.map((item) => <article className={`yj-candidate ${selected.includes(item.id) ? "selected" : ""}`} key={item.id}><div className="yj-candidate-image">{item.dataUrl ? <img src={item.dataUrl} alt={item.name} loading="lazy" decoding="async" /> : <div className="yj-image-placeholder">NO IMAGE</div>}<span>{item.category}</span></div><div className="yj-candidate-body"><small>{item.brand || "用户添加"}</small><h3>{item.name}</h3><b>{item.model || "型号待补"}</b><dl><div><dt>产品尺寸</dt><dd>{item.size || "待补"}</dd></div><div><dt>安装尺寸 / 预留</dt><dd>{item.install || "待现场确认"}</dd></div></dl><label className="yj-price-input">实际到手价 ¥<input value={prices[item.id] ?? item.price ?? ""} onChange={(e) => setPrice(item.id, Number(e.target.value))} type="number" min="0" placeholder="不预设" /></label><p>{item.note}</p>{item.url && <a className="yj-inline-link" href={item.url} target="_blank" rel="noreferrer">商品 / 购买链接 ↗</a>}<div className="yj-card-actions"><button onClick={() => toggle(item.id)}>{selected.includes(item.id) ? "✓ 已加入" : "+ 加入愿望单"}</button><button className="danger" onClick={() => deleteItem(item.id)}>删除</button></div></div></article>)}</section>{!presets.length && !ownItems.length && <p className="yj-empty">这里暂时是空的。点击“添加{title}候选”，从你实际看过的品牌开始记录。</p>}{showForm && <Modal title={`添加${title}候选`} close={() => setShowForm(false)}><form className="yj-form" onSubmit={addItem}><label>品类<select name="category">{categories.map((category) => <option key={category}>{category}</option>)}</select></label><label>名称<input name="name" required /></label><label>品牌<input name="brand" /></label><label>型号<input name="model" /></label><label>产品尺寸<input name="size" placeholder="长 × 宽 × 高 mm" /></label><label>实际价格<input name="price" type="number" min="0" placeholder="可留空" /></label><label className="wide">安装尺寸 / 预留<input name="install" placeholder="洞口、散热、水电、检修与运输要求" /></label><label className="wide">商品 / 购买链接<input name="url" type="url" placeholder="https://…（可留空）" /></label><label className="wide">图片<input name="image" type="file" accept="image/*" /></label><label className="wide">详情说明<textarea name="note" rows={4} /></label><div className="wide yj-form-actions"><button type="button" onClick={() => setShowForm(false)}>取消</button><button type="submit">保存候选</button></div></form></Modal>}</div>;
 }
 
 function DoorsPage({ selected, toggle, prices, setPrice }: { selected: string[]; toggle: (id: string) => void; prices: Record<string, number>; setPrice: (id: string, price: number) => void }) {
   return <div className="yj-page"><PageHead eyebrow="DOOR & OPENING SYSTEM" title="门窗系统" lead="门款独立对比；价格、洞口、开启方向、锁体和收口在复尺后逐项补齐。" /><div className="yj-door-guidance"><div><b>01 · 先复尺</b><span>墙厚、洞口宽高、门槛高度、外开/内开及入户电梯运输条件</span></div><div><b>02 · 再确认</b><span>断桥结构、填充、合页、锁体、智能锁、开门角度与保修</span></div><div><b>03 · 最后定色</b><span>与玄关木饰面、柜门、地砖和金属件放在同一光线下看</span></div></div><section className="yj-candidate-grid yj-door-grid">{doors.map((item) => <CandidateCard key={item.id} item={{ ...item, price: prices[item.id] || 0 }} selected={selected.includes(item.id)} toggle={() => toggle(item.id)} priceEditor={<label className="yj-price-input">补录到手价 ¥<input value={prices[item.id] || ""} onChange={(e) => setPrice(item.id, Number(e.target.value))} type="number" min="0" placeholder="待询价" /></label>} />)}</section></div>;
 }
 
-function BudgetPage({ rows, included, toggle, total, selected, doorPrices }: { rows: { id: string; name: string; detail: string; value: number }[]; included: Record<string, boolean>; toggle: (id: string) => void; total: number; selected: (Candidate | LocalRecord)[]; doorPrices: Record<string, number> }) {
-  return <div className="yj-page"><PageHead eyebrow="UNIFIED QUOTATION" title="预算台账" lead="各分区独立选择，这里只负责统一汇总；勾选决定是否计入当前报价方案。" /><section className="yj-budget-hero"><div><span>当前方案合计</span><strong>{money(total)}</strong><small>未补价格的候选不会计入总额</small></div><aside><p>本页会读取家电选型台当前方案，并叠加主次卫瓷砖、门和自定义主材。全屋智能原方案默认不计入，确认调整版后再勾选。</p></aside></section><section className="yj-budget-table"><header><span>计入</span><b>分区 / 方案</b><em>说明</em><strong>金额</strong></header>{rows.map((row) => <div key={row.id} className={included[row.id] ? "included" : ""}><span><input type="checkbox" checked={!!included[row.id]} onChange={() => toggle(row.id)} aria-label={`计入${row.name}`} /></span><b>{row.name}</b><em>{row.detail}</em><strong>{row.value ? money(row.value) : "待补"}</strong></div>)}<footer><span /><b>当前总计</b><em>以最终合同、复尺与实际发生为准</em><strong>{money(total)}</strong></footer></section><section className="yj-selected-summary"><div className="yj-section-title"><p>SELECTED ITEMS</p><h2>已选候选明细</h2></div>{selected.length ? <div className="yj-simple-list">{selected.map((item) => <div key={item.id}><span>{"category" in item ? item.category : "其他"}</span><b>{"brand" in item ? item.brand : ""} {item.name}</b><em>{"model" in item ? item.model : ""}</em><strong>{money("price" in item && item.price ? item.price : doorPrices[item.id] || 0)}</strong></div>)}</div> : <p className="yj-empty">还没有从门或主材分区加入候选。</p>}</section></div>;
+function BudgetPage({ rows }: { rows: QuoteRow[] }) {
+  const [manual, setManual] = useState<QuoteRow[]>([]);
+  const [overrides, setOverrides] = useState<Record<string, number>>({});
+  const [included, setIncluded] = useState<Record<string, boolean>>({});
+  const [showForm, setShowForm] = useState(false);
+  useEffect(() => {
+    try {
+      setManual(JSON.parse(localStorage.getItem("yj-manual-budget-v2") || "[]"));
+      setOverrides(JSON.parse(localStorage.getItem("yj-budget-overrides-v2") || "{}"));
+      setIncluded(JSON.parse(localStorage.getItem("yj-budget-included-v2") || "{}"));
+    } catch {}
+  }, []);
+  const allRows = [...rows, ...manual];
+  const valueOf = (row: QuoteRow) => overrides[row.id] ?? row.value;
+  const isIncluded = (row: QuoteRow) => included[row.id] !== false;
+  const total = allRows.filter(isIncluded).reduce((sum, row) => sum + valueOf(row), 0);
+  const persist = (key: string, value: unknown) => localStorage.setItem(key, JSON.stringify(value));
+  const updateValue = (id: string, value: number) => setOverrides((current) => { const next = { ...current, [id]: value }; persist("yj-budget-overrides-v2", next); return next; });
+  const toggle = (id: string) => setIncluded((current) => { const next = { ...current, [id]: current[id] === false }; persist("yj-budget-included-v2", next); return next; });
+  const add = (event: FormEvent<HTMLFormElement>) => { event.preventDefault(); const form = new FormData(event.currentTarget); const next = [...manual, { id: `budget-${Date.now()}`, category: String(form.get("category") || "其他"), name: String(form.get("name") || "未命名项目"), detail: String(form.get("detail") || ""), value: Number(form.get("value") || 0) }]; setManual(next); persist("yj-manual-budget-v2", next); setShowForm(false); };
+  const remove = (id: string) => { const next = manual.filter((row) => row.id !== id); setManual(next); persist("yj-manual-budget-v2", next); };
+  const exportCsv = () => { const body = [["计入", "分类", "项目", "说明", "金额"], ...allRows.map((row) => [isIncluded(row) ? "是" : "否", row.category, row.name, row.detail, String(valueOf(row) || "")]), ["", "", "合计", "", String(total)]]; const csv = `\uFEFF${body.map((line) => line.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(",")).join("\r\n")}`; const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" })); a.download = "悦景新世界-装修预算.csv"; a.click(); URL.revokeObjectURL(a.href); };
+  return <div className="yj-page"><PageHead eyebrow="UNIFIED QUOTATION" title="预算台账" lead="没有默认品牌和默认金额。只有你主动选择或手工添加的项目才出现，所有价格都可以覆盖修改。" /><section className="yj-budget-hero"><div><span>当前报价合计</span><strong>{money(total)}</strong><small>{allRows.length} 个项目 · 未填价格按 0 计算</small></div><aside><p>全屋智能、瓷砖、家具和全屋定制均不预设品牌。确认供应商后，可在这里手工新增一条，也可以从各自候选库加入。</p></aside></section><div className="yj-budget-actions"><button onClick={() => setShowForm(true)}>+ 添加预算项目</button><button onClick={exportCsv}>导出 CSV（Excel 可打开）</button></div>{allRows.length ? <section className="yj-budget-table"><header><span>计入</span><b>分类 / 项目</b><em>说明</em><strong>可编辑金额</strong></header>{allRows.map((row) => <div key={row.id} className={isIncluded(row) ? "included" : ""}><span><input type="checkbox" checked={isIncluded(row)} onChange={() => toggle(row.id)} aria-label={`计入${row.name}`} /></span><b><small>{row.category}</small>{row.name}</b><em>{row.detail || "—"}</em><strong><label>¥ <input type="number" min="0" value={valueOf(row) || ""} placeholder="待补" onChange={(event) => updateValue(row.id, Number(event.target.value))} /></label>{row.id.startsWith("budget-") && <button onClick={() => remove(row.id)}>删除</button>}</strong></div>)}<footer><span /><b>当前总计</b><em>以最终合同、复尺与实际发生为准</em><strong>{money(total)}</strong></footer></section> : <p className="yj-empty">报价单现在是空的。请先从各分区加入候选，或手工添加一个预算项目。</p>}{showForm && <Modal title="添加预算项目" close={() => setShowForm(false)}><form className="yj-form" onSubmit={add}><label>分类<select name="category"><option>全屋智能</option><option>家电</option><option>主材</option><option>家具</option><option>全屋定制</option><option>门窗</option><option>施工</option><option>其他</option></select></label><label>项目名称<input name="name" required /></label><label className="wide">品牌 / 型号 / 报价说明<input name="detail" /></label><label className="wide">金额<input name="value" type="number" min="0" placeholder="可留空" /></label><div className="wide yj-form-actions"><button type="button" onClick={() => setShowForm(false)}>取消</button><button type="submit">加入报价单</button></div></form></Modal>}</div>;
 }
 
 function DocumentsPage({ records, onChange }: { records: LocalRecord[]; onChange: (items: LocalRecord[]) => void }) {

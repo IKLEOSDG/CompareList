@@ -26,6 +26,7 @@ type Plan = { id: string; name: string; items: Record<string, PlanItem> };
 
 const optimizedImage = (path: string) =>
   /^(products|renovation)\//.test(path) ? path.replace(/\.(png|jpe?g)$/i, ".webp") : path;
+const productLink = (product: Product) => product.url || `https://s.taobao.com/search?q=${encodeURIComponent(`${product.brand} ${product.model}`)}`;
 
 const seedProducts: Product[] = [
   {
@@ -427,42 +428,36 @@ const seedProducts: Product[] = [
   },
 ];
 
-const starterItems: Record<string, PlanItem> = {
-  fridge487: { qty: 1, unitPrice: 5100 },
-  washer10: { qty: 1, unitPrice: 3800 },
-  dryer10: { qty: 1, unitPrice: 3800 },
-  dishwasher: { qty: 1, unitPrice: 4700 },
-  hood: { qty: 1, unitPrice: 3000 },
-  hob: { qty: 1, unitPrice: 1930 },
-  casarteoven: { qty: 1, unitPrice: 4750 },
-  prefilter: { qty: 1, unitPrice: 750 },
-};
 const initialPlans: Plan[] = [
-  { id: "main", name: "方案 A · 当前清单", items: starterItems },
-  {
-    id: "upgrade",
-    name: "方案 B · 品牌升级",
-    items: {
-      fridge487: { qty: 1, unitPrice: 5100 },
-      wallwasher: { qty: 1, unitPrice: 3999 },
-      dryer10: { qty: 1, unitPrice: 3800 },
-      robams2u: { qty: 1, unitPrice: 0 },
-      robamhood: { qty: 1, unitPrice: 0 },
-      robamhob: { qty: 1, unitPrice: 0 },
-      fotileg5p: { qty: 1, unitPrice: 0 },
-    },
-  },
+  { id: "main", name: "方案 A · 空白愿望单", items: {} },
 ];
 const categories = [
   "全部",
   "冰箱",
+  "冷柜 / 冰吧",
   "洗衣机",
   "干衣机",
   "洗碗机",
   "油烟机",
   "燃气灶",
   "蒸烤一体机",
+  "电视",
+  "投影 / 影音",
+  "中央空调",
+  "新风系统",
+  "悬挂式晾衣架",
+  "扫地机器人",
+  "吸尘器 / 洗地机",
+  "全屋净水",
+  "软水机",
+  "净饮机",
+  "热水器",
+  "厨余处理器",
+  "嵌入式咖啡机",
+  "智能马桶",
+  "浴霸",
   "前置过滤器",
+  "其他",
 ];
 const money = (n: number) =>
   n
@@ -472,6 +467,22 @@ const money = (n: number) =>
         maximumFractionDigits: 0,
       }).format(n)
     : "待询价";
+
+const csvCell = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+function exportPlanCsv(plan: Plan, products: Product[]) {
+  const rows = [["品类", "品牌", "产品", "型号", "产品尺寸", "安装尺寸/预留", "数量", "单价", "小计", "购买链接"]];
+  Object.entries(plan.items).forEach(([id, item]) => {
+    const p = products.find((product) => product.id === id);
+    if (!p) return;
+    rows.push([p.category, p.brand, p.name, p.model, p.size, p.install || "待现场确认", String(item.qty), String(item.unitPrice || ""), String(item.unitPrice * item.qty || ""), productLink(p)]);
+  });
+  const csv = `\uFEFF${rows.map((row) => row.map(csvCell).join(",")).join("\r\n")}`;
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  link.download = `${plan.name.replace(/[\\/:*?"<>|]/g, "-")}.csv`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
 
 export default function Home() {
   const [products, setProducts] = useState<Product[]>(seedProducts);
@@ -485,10 +496,11 @@ export default function Home() {
   const [showCustom, setShowCustom] = useState(false);
   const [showQuote, setShowQuote] = useState(false);
   const [showPlanCompare, setShowPlanCompare] = useState(false);
+  const [detailProduct, setDetailProduct] = useState<Product | null>(null);
   const [hydrated, setHydrated] = useState(false);
   useEffect(() => {
     try {
-      const saved = localStorage.getItem("home-select-v1");
+      const saved = localStorage.getItem("home-select-v2");
       if (saved) {
         const d = JSON.parse(saved);
         setProducts([...seedProducts, ...(d.customProducts || [])]);
@@ -499,15 +511,19 @@ export default function Home() {
     setHydrated(true);
   }, []);
   useEffect(() => {
-    if (hydrated)
+    if (hydrated) {
       localStorage.setItem(
-        "home-select-v1",
+        "home-select-v2",
         JSON.stringify({
           customProducts: products.filter((p) => p.custom),
           plans,
           activePlanId,
         }),
       );
+      const current = plans.find((plan) => plan.id === activePlanId) || plans[0];
+      const total = Object.values(current.items).reduce((sum, item) => sum + item.qty * item.unitPrice, 0);
+      window.dispatchEvent(new CustomEvent("home-select-updated", { detail: { total } }));
+    }
   }, [products, plans, activePlanId, hydrated]);
   const activePlan = plans.find((p) => p.id === activePlanId) || plans[0];
   const filtered = useMemo(
@@ -613,11 +629,11 @@ export default function Home() {
           : ids,
     );
   const resetData = () => {
-    if (window.confirm("恢复初始设备库与两套示例方案？自定义内容会被清除。")) {
+    if (window.confirm("清空愿望方案并恢复设备候选库？自定义设备也会被清除。")) {
       setProducts(seedProducts);
       setPlans(initialPlans);
       setActivePlanId("main");
-      localStorage.removeItem("home-select-v1");
+      localStorage.removeItem("home-select-v2");
     }
   };
   const addCustom = (e: FormEvent<HTMLFormElement>) => {
@@ -638,6 +654,8 @@ export default function Home() {
         .split(/[，,]/)
         .filter(Boolean),
       custom: true,
+      url: String(f.get("url") || ""),
+      note: String(f.get("note") || ""),
     };
     setProducts((v) => [p, ...v]);
     setShowCustom(false);
@@ -794,20 +812,15 @@ export default function Home() {
                   <h3>{p.name}</h3>
                   <div className="model">{p.model}</div>
                   <div className="size">
-                    产品尺寸（宽×深×高）<b>{p.size}</b>
-                    <small>{p.install}</small>
+                    <div><span>产品尺寸</span><b>{p.size}</b></div>
+                    <div><span>安装尺寸 / 预留</span><b>{p.install || "待现场确认"}</b></div>
                   </div>
                   <div className="features">
                     {p.features.map((f) => (
                       <span key={f}>{f}</span>
                     ))}
                   </div>
-                  {p.note && (
-                    <details>
-                      <summary>安装 / 选购备注</summary>
-                      <p>{p.note}</p>
-                    </details>
-                  )}
+                  <button className="detail-link" onClick={() => setDetailProduct(p)}>查看详情、备注与大图 →</button>
                   <div className="card-foot">
                     <label className="compare-check">
                       <input
@@ -984,6 +997,14 @@ export default function Home() {
                 placeholder="https://…（可不填）"
               />
             </label>
+            <label className="wide">
+              购买 / 商品链接
+              <input name="url" type="url" placeholder="https://…（可不填）" />
+            </label>
+            <label className="wide">
+              详情与安装备注
+              <input name="note" placeholder="选购重点、施工条件、验收事项" />
+            </label>
             <div className="form-actions">
               <button type="button" onClick={() => setShowCustom(false)}>
                 取消
@@ -1045,6 +1066,29 @@ export default function Home() {
           </div>
         </Modal>
       )}
+      {detailProduct && (
+        <Modal title={`${detailProduct.brand} · ${detailProduct.name}`} wide onClose={() => setDetailProduct(null)}>
+          <div className="product-detail">
+            <div className="product-detail-image"><img src={optimizedImage(detailProduct.image)} alt={`${detailProduct.brand} ${detailProduct.name}`} decoding="async" /></div>
+            <article>
+              <span className="detail-category">{detailProduct.category} · {detailProduct.source}</span>
+              <h3>{detailProduct.model}</h3>
+              <dl>
+                <div><dt>产品尺寸</dt><dd>{detailProduct.size}</dd></div>
+                <div><dt>安装尺寸 / 预留</dt><dd>{detailProduct.install || "待现场确认"}</dd></div>
+                <div><dt>你的参考价</dt><dd>{money(detailProduct.price)}</dd></div>
+                <div><dt>淘宝参考价</dt><dd>{detailProduct.taobaoPrice ? money(detailProduct.taobaoPrice) : "未录入"}</dd></div>
+              </dl>
+              <div className="detail-features">{detailProduct.features.map((feature) => <span key={feature}>{feature}</span>)}</div>
+              <p>{detailProduct.note || "详细说明待补充。"}</p>
+              <div className="detail-actions">
+                <a href={productLink(detailProduct)} target="_blank" rel="noreferrer">{detailProduct.url ? "打开商品 / 购买链接 ↗" : "去淘宝搜索该型号 ↗"}</a>
+                <button className="primary" onClick={() => { addToPlan(detailProduct.id); setDetailProduct(null); }}>加入当前方案</button>
+              </div>
+            </article>
+          </div>
+        </Modal>
+      )}
       {showQuote && (
         <Modal
           title={`${activePlan.name} · 完整报价`}
@@ -1058,7 +1102,7 @@ export default function Home() {
           />
           <div className="modal-actions">
             <p>价格为当前方案中的可编辑单价；“待询价”项目不计入总额。</p>
-            <button onClick={() => window.print()}>打印 / 另存为 PDF</button>
+            <div><button onClick={() => exportPlanCsv(activePlan, products)}>导出 CSV（Excel 可打开）</button><button onClick={() => window.print()}>打印 / 另存为 PDF</button></div>
           </div>
         </Modal>
       )}
@@ -1163,7 +1207,8 @@ function QuoteTable({
       <div className="qt-row head">
         <b>品类 / 产品</b>
         <b>型号</b>
-        <b>尺寸</b>
+        <b>产品尺寸</b>
+        <b>安装尺寸 / 预留</b>
         <b>数量</b>
         <b>单价</b>
         <b>小计</b>
@@ -1181,6 +1226,7 @@ function QuoteTable({
             </span>
             <span>{p.model}</span>
             <span>{p.size}</span>
+            <span>{p.install || "待现场确认"}</span>
             <span>{item.qty}</span>
             <span>{money(item.unitPrice)}</span>
             <strong>{money(item.unitPrice * item.qty)}</strong>

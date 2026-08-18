@@ -6,8 +6,10 @@ export type LocalRecord = {
   brand?: string;
   model?: string;
   size?: string;
+  install?: string;
   price?: number;
   note?: string;
+  url?: string;
   fileName?: string;
   mime?: string;
   dataUrl?: string;
