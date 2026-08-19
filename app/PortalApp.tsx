@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import ApplianceStudio from "./ApplianceStudio";
+import { getCloudStatus, setCloudKey } from "./cloudSync";
 import {
   fileToDataUrl,
   listRecords,
@@ -449,6 +450,7 @@ export default function PortalApp() {
   const [customItems, setCustomItems] = useState<LocalRecord[]>([]);
   const [localDocs, setLocalDocs] = useState<LocalRecord[]>([]);
   const [applianceTotal, setApplianceTotal] = useState(0);
+  const [smartTotal, setSmartTotal] = useState(0);
 
   useEffect(() => {
     const update = () => {
@@ -459,9 +461,14 @@ export default function PortalApp() {
       setApplianceTotal(
         Number((event as CustomEvent<{ total: number }>).detail?.total || 0),
       );
+    const updateSmartTotal = (event: Event) =>
+      setSmartTotal(
+        Number((event as CustomEvent<{ total: number }>).detail?.total || 0),
+      );
     update();
     addEventListener("hashchange", update);
     addEventListener("home-select-updated", updateApplianceTotal);
+    addEventListener("yj-smart-updated", updateSmartTotal);
     try {
       setSelected(JSON.parse(localStorage.getItem("yj-selected-v2") || "[]"));
       setItemPrices(
@@ -480,6 +487,15 @@ export default function PortalApp() {
             plan.items as Record<string, { qty: number; unitPrice: number }>,
           ).reduce((sum, item) => sum + item.qty * item.unitPrice, 0),
         );
+      const smart = JSON.parse(
+        localStorage.getItem("yj-smart-studio-v1") || "null",
+      );
+      if (smart?.items)
+        setSmartTotal(
+          Object.values(
+            smart.items as Record<string, { qty: number; unitPrice: number }>,
+          ).reduce((sum, item) => sum + item.qty * item.unitPrice, 0),
+        );
     } catch {}
     listRecords("candidate")
       .then(setCustomItems)
@@ -490,6 +506,7 @@ export default function PortalApp() {
     return () => {
       removeEventListener("hashchange", update);
       removeEventListener("home-select-updated", updateApplianceTotal);
+      removeEventListener("yj-smart-updated", updateSmartTotal);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -518,6 +535,17 @@ export default function PortalApp() {
   );
   const selectedAll = [...selectedDoors, ...selectedTiles, ...selectedCustom];
   const quoteRows: QuoteRow[] = [
+    ...(smartTotal
+      ? [
+          {
+            id: "smart-home",
+            category: "全屋智能",
+            name: "全屋智能当前方案",
+            detail: "读取全屋智能选型台当前部件",
+            value: smartTotal,
+          },
+        ]
+      : []),
     ...(applianceTotal
       ? [
           {
@@ -667,10 +695,47 @@ function Topbar({ section }: { section: Section }) {
           </a>
         ))}
       </nav>
+      <CloudStatus />
       <a className="yj-quote-link" href="#budget">
         报价单
       </a>
     </header>
+  );
+}
+
+function CloudStatus() {
+  const initial = getCloudStatus();
+  const [status, setStatus] = useState(initial.status);
+  const [detail, setDetail] = useState(initial.detail);
+  useEffect(() => {
+    const update = (event: Event) => {
+      const next = (event as CustomEvent<{ status: string; detail?: string }>)
+        .detail;
+      setStatus(next?.status || "未连接");
+      setDetail(next?.detail || "");
+    };
+    addEventListener("yj-cloud-status", update);
+    return () => removeEventListener("yj-cloud-status", update);
+  }, []);
+  const configure = () => {
+    const key = prompt(
+      "输入悦景项目云端访问口令。口令只保存在当前浏览器。",
+      "",
+    );
+    if (key?.trim()) {
+      setCloudKey(key);
+      location.reload();
+    }
+  };
+  return (
+    <button
+      className={`yj-cloud-status ${status === "已同步" ? "online" : ""}`}
+      onClick={configure}
+      title={detail || "设置跨设备同步"}
+    >
+      <i />
+      {status}
+    </button>
   );
 }
 
@@ -744,9 +809,24 @@ const dashboardColors = [
   "#8c6b59",
   "#b7b2a5",
 ];
+const defaultPhases = [
+  "拆除 / 砸墙",
+  "砌筑 / 门洞",
+  "水电改造",
+  "中央空调 / 新风",
+  "防水 / 闭水",
+  "瓦工 / 瓷砖",
+  "吊顶 / 墙面",
+  "全屋定制 / 门窗",
+  "设备 / 灯具安装",
+  "家具软装",
+  "调试 / 验收",
+].map((name) => ({ name, status: "未开始", note: "" }));
+type ProjectPhase = (typeof defaultPhases)[number];
 
 function HomePage({ rows }: { rows: QuoteRow[] }) {
   const [progress, setProgress] = useState(0);
+  const [phases, setPhases] = useState<ProjectPhase[]>(defaultPhases);
   const [budget, setBudget] = useState({
     total: 0,
     count: 0,
@@ -811,12 +891,31 @@ function HomePage({ rows }: { rows: QuoteRow[] }) {
   useEffect(() => {
     const saved = Number(localStorage.getItem("yj-project-progress-v1") || 0);
     setProgress(Math.min(100, Math.max(0, saved)));
+    try {
+      const savedPhases = JSON.parse(
+        localStorage.getItem("yj-project-phases-v1") || "null",
+      );
+      if (Array.isArray(savedPhases) && savedPhases.length)
+        setPhases(savedPhases);
+    } catch {}
   }, []);
   const updateProgress = (value: number) => {
     const next = Math.min(100, Math.max(0, value || 0));
     setProgress(next);
     localStorage.setItem("yj-project-progress-v1", String(next));
   };
+  const updatePhase = (
+    index: number,
+    field: "status" | "note",
+    value: string,
+  ) =>
+    setPhases((current) => {
+      const next = current.map((phase, phaseIndex) =>
+        phaseIndex === index ? { ...phase, [field]: value } : phase,
+      );
+      localStorage.setItem("yj-project-phases-v1", JSON.stringify(next));
+      return next;
+    });
   let cursor = 0;
   const segments = budget.total
     ? budget.categories.map((item, index) => {
@@ -947,6 +1046,41 @@ function HomePage({ rows }: { rows: QuoteRow[] }) {
                 <p>进度仅用于项目总览，不会修改预算金额。</p>
               </div>
             </div>
+            <div className="yj-phase-timeline">
+              <div className="yj-phase-head">
+                <b>文字施工进度</b>
+                <span>阶段、状态和现场说明均自动保存</span>
+              </div>
+              {phases.map((phase, index) => (
+                <div
+                  className={`yj-phase-row status-${phase.status}`}
+                  key={phase.name}
+                >
+                  <i>{String(index + 1).padStart(2, "0")}</i>
+                  <b>{phase.name}</b>
+                  <select
+                    value={phase.status}
+                    onChange={(event) =>
+                      updatePhase(index, "status", event.target.value)
+                    }
+                    aria-label={`${phase.name}状态`}
+                  >
+                    <option>未开始</option>
+                    <option>进行中</option>
+                    <option>已完成</option>
+                    <option>暂停</option>
+                  </select>
+                  <input
+                    value={phase.note}
+                    onChange={(event) =>
+                      updatePhase(index, "note", event.target.value)
+                    }
+                    placeholder="填写现场进度、日期或待办…"
+                    aria-label={`${phase.name}说明`}
+                  />
+                </div>
+              ))}
+            </div>
           </article>
           <a className="yj-dashboard-plan" href="#design">
             <img
@@ -1007,7 +1141,254 @@ function HomePage({ rows }: { rows: QuoteRow[] }) {
   );
 }
 
+type SmartPart = {
+  id: string;
+  ecosystem: "小米" | "涂鸦" | "三翼鸟";
+  category: string;
+  name: string;
+  model: string;
+  note: string;
+};
+type SmartPlanItem = { qty: number; unitPrice: number; rooms: string[] };
+const smartEcosystems = [
+  {
+    id: "小米",
+    title: "小米 / 米家",
+    protocol: "Matter · 蓝牙 Mesh · Zigbee",
+    strength: "零售生态完整、自助扩展方便、设备选择多",
+    caution: "跨品牌联动和本地化能力需逐项核实",
+  },
+  {
+    id: "涂鸦",
+    title: "涂鸦智能",
+    protocol: "Matter · Zigbee · Wi-Fi",
+    strength: "品牌与品类覆盖广，适合定制面板和多供应商",
+    caution: "不同厂商固件、售后和 App 体验差异较大",
+  },
+  {
+    id: "三翼鸟",
+    title: "三翼鸟 / 海尔智家",
+    protocol: "UHomeOS · Wi-Fi · 网关",
+    strength: "成套交付和服务组织能力强，海尔家电联动方便",
+    caution: "生态边界、第三方接入及持续服务费用要写入合同",
+  },
+] as const;
+const smartParts: SmartPart[] = [
+  [
+    "mi-gateway",
+    "小米",
+    "控制",
+    "多模网关",
+    "米家多模网关 2",
+    "作为米家设备入口，位置需兼顾覆盖与供电",
+  ],
+  [
+    "mi-panel",
+    "小米",
+    "控制",
+    "智能场景面板",
+    "中控屏 / 场景屏候选",
+    "墙面实体控制优先，断网保留基础开关",
+  ],
+  [
+    "mi-switch",
+    "小米",
+    "照明",
+    "零火智能开关",
+    "1–4 键按回路选型",
+    "所有开关底盒预留零线和深底盒",
+  ],
+  [
+    "mi-presence",
+    "小米",
+    "传感",
+    "人体存在传感器",
+    "毫米波存在传感器",
+    "卫生间、客厅需测试静坐和误触发",
+  ],
+  [
+    "mi-curtain",
+    "小米",
+    "遮阳",
+    "智能窗帘电机",
+    "米家窗帘电机候选",
+    "复尺轨道长度、电机侧和插座位置",
+  ],
+  [
+    "mi-leak",
+    "小米",
+    "安防",
+    "水浸传感器",
+    "米家水浸卫士",
+    "厨房、卫生间、净水设备附近布置",
+  ],
+  [
+    "tuya-gateway",
+    "涂鸦",
+    "控制",
+    "Zigbee / Matter 网关",
+    "Tuya 网关候选",
+    "要求本地场景能力和断网可用说明",
+  ],
+  [
+    "tuya-panel",
+    "涂鸦",
+    "控制",
+    "智能中控屏",
+    "涂鸦中控屏候选",
+    "确认 OEM 品牌、固件升级和售后主体",
+  ],
+  [
+    "tuya-switch",
+    "涂鸦",
+    "照明",
+    "零火智能开关",
+    "涂鸦 Zigbee 开关",
+    "按回路数量、负载和调光协议拆分",
+  ],
+  [
+    "tuya-sensor",
+    "涂鸦",
+    "传感",
+    "人体存在传感器",
+    "Zigbee / 毫米波候选",
+    "在卫生间做静止存在现场测试",
+  ],
+  [
+    "tuya-curtain",
+    "涂鸦",
+    "遮阳",
+    "智能窗帘电机",
+    "涂鸦窗帘电机候选",
+    "确认电机噪声、轨道和断电手拉",
+  ],
+  [
+    "tuya-air",
+    "涂鸦",
+    "暖通",
+    "空调 / 新风控制器",
+    "干接点 / 网关模块",
+    "与中央空调厂家协议表逐项核对",
+  ],
+  [
+    "sy-gateway",
+    "三翼鸟",
+    "控制",
+    "全屋智能网关",
+    "三翼鸟网关候选",
+    "要求提交离线能力、设备上限和协议清单",
+  ],
+  [
+    "sy-panel",
+    "三翼鸟",
+    "控制",
+    "智家中控屏",
+    "海尔智家中控屏",
+    "明确屏幕、语音、场景和家电控制边界",
+  ],
+  [
+    "sy-switch",
+    "三翼鸟",
+    "照明",
+    "智能开关 / 面板",
+    "三翼鸟场景面板",
+    "逐路列功率、驱动和墙面按键逻辑",
+  ],
+  [
+    "sy-sensor",
+    "三翼鸟",
+    "传感",
+    "人体 / 环境传感器",
+    "智家传感器组合",
+    "合同列明型号、数量、点位和验收方法",
+  ],
+  [
+    "sy-appliance",
+    "三翼鸟",
+    "家电联动",
+    "海尔智家联动模块",
+    "UHomeOS 家电联动",
+    "大型家电仍按产品力选择，不强制统一品牌",
+  ],
+  [
+    "sy-service",
+    "三翼鸟",
+    "交付",
+    "安装调试服务",
+    "全屋交付服务",
+    "施工、编程、培训和售后费用单独列项",
+  ],
+].map(
+  ([id, ecosystem, category, name, model, note]) =>
+    ({ id, ecosystem, category, name, model, note }) as SmartPart,
+);
+const smartRooms = [
+  "玄关",
+  "客厅",
+  "餐厅",
+  "厨房",
+  "主卧",
+  "次卧",
+  "书房",
+  "主卫",
+  "次卫",
+  "阳台",
+  "全屋",
+];
+
 function SmartChoicePage() {
+  const [ecosystem, setEcosystem] = useState<SmartPart["ecosystem"]>("小米");
+  const [items, setItems] = useState<Record<string, SmartPlanItem>>({});
+  const [roomDraft, setRoomDraft] = useState<Record<string, string>>({});
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(
+        localStorage.getItem("yj-smart-studio-v1") || "null",
+      );
+      if (saved?.ecosystem) setEcosystem(saved.ecosystem);
+      if (saved?.items) setItems(saved.items);
+    } catch {}
+    setHydrated(true);
+  }, []);
+  useEffect(() => {
+    if (!hydrated) return;
+    localStorage.setItem(
+      "yj-smart-studio-v1",
+      JSON.stringify({ ecosystem, items }),
+    );
+    const total = Object.values(items).reduce(
+      (sum, item) => sum + item.qty * item.unitPrice,
+      0,
+    );
+    dispatchEvent(new CustomEvent("yj-smart-updated", { detail: { total } }));
+  }, [ecosystem, items, hydrated]);
+  const addPart = (part: SmartPart) => {
+    const room = roomDraft[part.id] || "全屋";
+    setItems((current) => {
+      const existing = current[part.id];
+      return {
+        ...current,
+        [part.id]: existing
+          ? {
+              ...existing,
+              qty: existing.qty + 1,
+              rooms: [...existing.rooms, room],
+            }
+          : { qty: 1, unitPrice: 0, rooms: [room] },
+      };
+    });
+  };
+  const removePart = (id: string) =>
+    setItems((current) => {
+      const next = { ...current };
+      delete next[id];
+      return next;
+    });
+  const total = Object.values(items).reduce(
+    (sum, item) => sum + item.qty * item.unitPrice,
+    0,
+  );
   const systems = [
     ["控制与面板", "网关、实体场景面板、智能开关与断网可用性"],
     ["灯光调光", "客厅、餐桌、主卧、书房按回路与驱动重新核对"],
@@ -1023,6 +1404,166 @@ function SmartChoicePage() {
         title="全屋智能"
         lead="当前生态与供应商均未确定。这里保存候选方案、点位和验收条款，不代表采用三翼鸟。"
       />
+      <section className="yj-smart-studio">
+        <div className="yj-section-title">
+          <p>ECOSYSTEM PLANNER</p>
+          <h2>先选系统，再选部件</h2>
+          <span>
+            三套生态可切换比较；加入的部件、房间、数量和价格会自动保存并进入统一预算。
+          </span>
+        </div>
+        <div className="yj-ecosystem-grid">
+          {smartEcosystems.map((item) => (
+            <button
+              key={item.id}
+              className={ecosystem === item.id ? "active" : ""}
+              onClick={() => setEcosystem(item.id)}
+            >
+              <span>{item.protocol}</span>
+              <h3>{item.title}</h3>
+              <p>{item.strength}</p>
+              <small>{item.caution}</small>
+            </button>
+          ))}
+        </div>
+        <div className="yj-smart-workspace">
+          <section className="yj-smart-catalog">
+            <header>
+              <div>
+                <b>{ecosystem}部件库</b>
+                <span>
+                  {
+                    smartParts.filter((part) => part.ecosystem === ecosystem)
+                      .length
+                  }{" "}
+                  类候选
+                </span>
+              </div>
+              <strong>{money(total)}</strong>
+            </header>
+            <div className="yj-smart-part-grid">
+              {smartParts
+                .filter((part) => part.ecosystem === ecosystem)
+                .map((part) => {
+                  const selected = items[part.id];
+                  return (
+                    <article
+                      className={selected ? "selected" : ""}
+                      key={part.id}
+                    >
+                      <span>{part.category}</span>
+                      <h3>{part.name}</h3>
+                      <b>{part.model}</b>
+                      <p>{part.note}</p>
+                      <label>
+                        放置位置
+                        <select
+                          value={roomDraft[part.id] || "全屋"}
+                          onChange={(event) =>
+                            setRoomDraft((current) => ({
+                              ...current,
+                              [part.id]: event.target.value,
+                            }))
+                          }
+                        >
+                          {smartRooms.map((room) => (
+                            <option key={room}>{room}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <button onClick={() => addPart(part)}>
+                        {selected
+                          ? `再加一个（已有 ${selected.qty}）`
+                          : "+ 加入智能方案"}
+                      </button>
+                    </article>
+                  );
+                })}
+            </div>
+          </section>
+          <aside className="yj-smart-plan">
+            <header>
+              <div>
+                <span>CURRENT PLAN</span>
+                <h3>当前部件与房间</h3>
+              </div>
+              <strong>{money(total)}</strong>
+            </header>
+            {Object.entries(items).length ? (
+              Object.entries(items).map(([id, item]) => {
+                const part = smartParts.find(
+                  (candidate) => candidate.id === id,
+                );
+                if (!part) return null;
+                return (
+                  <div className="yj-smart-plan-row" key={id}>
+                    <div>
+                      <b>
+                        {part.name} × {item.qty}
+                      </b>
+                      <span>{item.rooms.join(" / ")}</span>
+                    </div>
+                    <label>
+                      ¥
+                      <input
+                        type="number"
+                        min="0"
+                        value={item.unitPrice || ""}
+                        placeholder="单价"
+                        onChange={(event) =>
+                          setItems((current) => ({
+                            ...current,
+                            [id]: {
+                              ...current[id],
+                              unitPrice: Number(event.target.value),
+                            },
+                          }))
+                        }
+                      />
+                    </label>
+                    <button onClick={() => removePart(id)}>×</button>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="yj-empty">
+                从左侧选择系统部件，并指定放在哪个房间。
+              </p>
+            )}
+          </aside>
+        </div>
+        <section className="yj-room-simulation">
+          <header>
+            <span>ROOM SIMULATION</span>
+            <h3>各空间放什么</h3>
+            <p>这是点位讨论用的模拟，不代替施工图。</p>
+          </header>
+          <div>
+            {smartRooms
+              .filter((room) => room !== "全屋")
+              .map((room) => {
+                const assigned = Object.entries(items).flatMap(([id, item]) => {
+                  const part = smartParts.find(
+                    (candidate) => candidate.id === id,
+                  );
+                  return item.rooms
+                    .filter((value) => value === room || value === "全屋")
+                    .map(() => part?.name || "");
+                });
+                return (
+                  <article key={room}>
+                    <b>{room}</b>
+                    {assigned.length ? (
+                      <p>{assigned.join(" · ")}</p>
+                    ) : (
+                      <span>暂未放置</span>
+                    )}
+                  </article>
+                );
+              })}
+          </div>
+        </section>
+      </section>
       <section className="yj-smart-overview">
         <div>
           <span>历史候选报价</span>
@@ -2013,7 +2554,7 @@ function DocumentsPage({
       <PageHead
         eyebrow="PROJECT DOCUMENTS"
         title="施工资料"
-        lead="原始图纸、方案、报价、评审、交底和验收记录集中归档；本地上传不会发到网络。"
+        lead="原始图纸、方案、报价、评审、交底和验收记录集中归档；连接项目云端后可跨设备同步，离线预览时保存在本机。"
       />
       <section className="yj-doc-grid">
         {documents.map(([name, type, url, note]) => (
@@ -2030,7 +2571,7 @@ function DocumentsPage({
           <p className="yj-kicker">LOCAL ARCHIVE</p>
           <h2>补充本地资料</h2>
           <p>
-            适合继续添加门店报价、沙发尺寸图、合同、现场照片和验收记录。数据保存在当前浏览器中。
+            适合继续添加门店报价、沙发尺寸图、合同、现场照片和验收记录。连接项目云端后资料会跨设备同步；未连接时保存在当前浏览器中。
           </p>
         </div>
         <form onSubmit={upload}>
@@ -2046,7 +2587,7 @@ function DocumentsPage({
             备注
             <textarea name="note" rows={3} />
           </label>
-          <button type="submit">保存到本地资料库</button>
+          <button type="submit">保存资料</button>
         </form>
       </section>
       {records.length > 0 && (

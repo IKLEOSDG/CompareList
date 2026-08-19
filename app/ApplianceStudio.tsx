@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { uploadCloudFile } from "./cloudSync";
 
 type Source = "网上看" | "现场看" | "新增推荐" | "用户添加";
 type Product = {
@@ -675,9 +676,20 @@ export default function Home() {
       localStorage.removeItem("home-select-v2");
     }
   };
-  const addCustom = (e: FormEvent<HTMLFormElement>) => {
+  const addCustom = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    const f = new FormData(e.currentTarget);
+    const form = e.currentTarget;
+    const f = new FormData(form);
+    const photo = f.get("photo") as File;
+    let image = String(f.get("image") || "og.png");
+    if (photo?.size) {
+      try {
+        image = await uploadCloudFile(photo);
+      } catch (error) {
+        alert(error instanceof Error ? error.message : "照片上传失败");
+        return;
+      }
+    }
     const p: Product = {
       id: `custom-${Date.now()}`,
       category: String(f.get("category")),
@@ -688,7 +700,7 @@ export default function Home() {
       install: String(f.get("install") || "待现场确认"),
       price: Number(f.get("price") || 0),
       source: "用户添加",
-      image: String(f.get("image") || "og.png"),
+      image,
       features: String(f.get("features") || "用户添加")
         .split(/[，,]/)
         .filter(Boolean),
@@ -698,6 +710,7 @@ export default function Home() {
     };
     setProducts((v) => [p, ...v]);
     setShowCustom(false);
+    form.reset();
   };
   const compareProducts = compareIds
     .map((id) => products.find((p) => p.id === id))
@@ -712,7 +725,7 @@ export default function Home() {
         <nav>
           <button onClick={() => setShowPlanCompare(true)}>方案对比</button>
           <button onClick={resetData}>恢复初始数据</button>
-          <div className="save-state">● 自动保存到本机</div>
+          <div className="save-state">● 自动保存并同步</div>
         </nav>
       </header>
       <section className="hero">
@@ -1046,7 +1059,16 @@ export default function Home() {
               <input name="features" placeholder="多个标签用逗号分隔" />
             </label>
             <label className="wide">
-              图片网址
+              现场照片（手机可直接拍照）
+              <input
+                name="photo"
+                type="file"
+                accept="image/*"
+                capture="environment"
+              />
+            </label>
+            <label className="wide">
+              或填写图片网址
               <input
                 name="image"
                 type="url"
