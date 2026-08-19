@@ -1,6 +1,6 @@
 # Cloudflare 跨设备数据配置
 
-站点前端仍由 Pages 托管；动态数据使用 D1，手机照片和附件使用 R2。本地打开 `static/index.html` 时自动退回本机存储，访问 `https://comparelist.pages.dev/` 时启用云端同步。
+站点前端仍由 Pages 托管；动态数据、压缩后的手机照片和小附件统一使用 D1。本地打开 `static/index.html` 时自动退回本机存储，访问 `https://comparelist.pages.dev/` 时启用云端同步。
 
 ## 1. 创建 D1 数据库
 
@@ -10,19 +10,14 @@
 npx wrangler d1 execute comparelist-data --remote --file=./migrations/0001_cloud_project.sql
 ```
 
-在 Pages 项目 `comparelist` 的 Settings → Bindings 中新增 D1 binding：
+## 2. 绑定 D1
+
+项目不再提交 `wrangler.toml`，绑定由 Cloudflare 控制台管理。在 Pages 项目 `comparelist` 的 Settings → Bindings 中新增 D1 binding：
 
 - Variable name: `DB`
 - D1 database: `comparelist-data`
 
 Production 和 Preview 环境都建议绑定。
-
-## 2. 创建 R2 存储桶
-
-创建 R2 bucket，建议命名 `comparelist-files`。在同一 Pages 项目新增 R2 binding：
-
-- Variable name: `FILES`
-- R2 bucket: `comparelist-files`
 
 ## 3. 设置项目访问口令
 
@@ -52,6 +47,6 @@ Production 和 Preview 环境都建议绑定。
 
 - 预算、家电方案、全屋智能方案、施工阶段：D1 中的项目状态快照。
 - 自定义主材/家具/定制候选和上传文档：D1 记录。
-- 图片和附件文件：R2 对象。
+- 手机照片会在浏览器中自动压缩后保存为 D1 二进制记录；单个附件限制约 1.2 MB。
 - 浏览器仍保留本机缓存，断网或 API 暂时失败时不会让页面无法使用。
-- 当前采用单项目、最后一次写入为准，适合家庭内部少量设备使用；不要把访问口令发给无关人员。
+- D1 免费版单库容量为 500 MB，适合家庭内部装修档案；建议保留重要原图的本机备份，不要把访问口令发给无关人员。

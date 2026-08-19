@@ -106,17 +106,64 @@ export function hasCloudKey() {
   return Boolean(projectKey());
 }
 
+const MAX_UPLOAD_BYTES = 1_250_000;
+
+function canvasBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob> {
+  return new Promise((resolve, reject) =>
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error("照片压缩失败"))),
+      "image/jpeg",
+      quality,
+    ),
+  );
+}
+
+async function prepareCloudUpload(file: File): Promise<File> {
+  if (!file.type.startsWith("image/")) {
+    if (file.size > MAX_UPLOAD_BYTES)
+      throw new Error("D1 单库模式下附件不能超过 1.2 MB");
+    return file;
+  }
+
+  const bitmap = await createImageBitmap(file);
+  let scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+  let result: Blob | null = null;
+  for (let round = 0; round < 5; round += 1) {
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    canvas
+      .getContext("2d")
+      ?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    for (const quality of [0.82, 0.72, 0.62, 0.52]) {
+      result = await canvasBlob(canvas, quality);
+      if (result.size <= MAX_UPLOAD_BYTES) break;
+    }
+    if (result && result.size <= MAX_UPLOAD_BYTES) break;
+    scale *= 0.78;
+  }
+  bitmap.close();
+  if (!result || result.size > MAX_UPLOAD_BYTES)
+    throw new Error("照片过大，请裁剪后重试");
+  return new File(
+    [result],
+    `${file.name.replace(/\.[^.]+$/, "") || "现场照片"}.jpg`,
+    { type: "image/jpeg" },
+  );
+}
+
 export async function uploadCloudFile(file: File): Promise<string> {
   if (!projectKey() || !onlineApi()) throw new Error("请先连接云端同步");
+  const upload = await prepareCloudUpload(file);
   const response = await fetch(
-    `/api/upload?name=${encodeURIComponent(file.name)}`,
+    `/api/upload?name=${encodeURIComponent(upload.name)}`,
     {
       method: "POST",
       headers: {
-        "Content-Type": file.type || "application/octet-stream",
+        "Content-Type": upload.type || "application/octet-stream",
         "X-Project-Key": projectKey(),
       },
-      body: file,
+      body: upload,
     },
   );
   if (!response.ok) throw new Error(await response.text());

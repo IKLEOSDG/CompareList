@@ -20,7 +20,7 @@ export const onRequestGet: PagesFunction<Env> = async ({ request, env }) => {
         .bind(kind)
         .all<{ data: string }>()
     : await env.DB.prepare(
-        "SELECT data FROM project_records ORDER BY updated_at DESC",
+        "SELECT data FROM project_records WHERE kind NOT LIKE 'file:%' ORDER BY updated_at DESC",
       ).all<{ data: string }>();
   return json(result.results.map((row) => JSON.parse(row.data)));
 };
