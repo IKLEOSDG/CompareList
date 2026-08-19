@@ -25,8 +25,12 @@ type PlanItem = { qty: number; unitPrice: number };
 type Plan = { id: string; name: string; items: Record<string, PlanItem> };
 
 const optimizedImage = (path: string) =>
-  /^(products|renovation)\//.test(path) ? path.replace(/\.(png|jpe?g)$/i, ".webp") : path;
-const productLink = (product: Product) => product.url || `https://s.taobao.com/search?q=${encodeURIComponent(`${product.brand} ${product.model}`)}`;
+  /^(products|renovation)\//.test(path)
+    ? path.replace(/\.(png|jpe?g)$/i, ".webp")
+    : path;
+const productLink = (product: Product) =>
+  product.url ||
+  `https://s.taobao.com/search?q=${encodeURIComponent(`${product.brand} ${product.model}`)}`;
 
 const seedProducts: Product[] = [
   {
@@ -468,17 +472,44 @@ const money = (n: number) =>
       }).format(n)
     : "待询价";
 
-const csvCell = (value: unknown) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+const csvCell = (value: unknown) =>
+  `"${String(value ?? "").replaceAll('"', '""')}"`;
 function exportPlanCsv(plan: Plan, products: Product[]) {
-  const rows = [["品类", "品牌", "产品", "型号", "产品尺寸", "安装尺寸/预留", "数量", "单价", "小计", "购买链接"]];
+  const rows = [
+    [
+      "品类",
+      "品牌",
+      "产品",
+      "型号",
+      "产品尺寸",
+      "安装尺寸/预留",
+      "数量",
+      "单价",
+      "小计",
+      "购买链接",
+    ],
+  ];
   Object.entries(plan.items).forEach(([id, item]) => {
     const p = products.find((product) => product.id === id);
     if (!p) return;
-    rows.push([p.category, p.brand, p.name, p.model, p.size, p.install || "待现场确认", String(item.qty), String(item.unitPrice || ""), String(item.unitPrice * item.qty || ""), productLink(p)]);
+    rows.push([
+      p.category,
+      p.brand,
+      p.name,
+      p.model,
+      p.size,
+      p.install || "待现场确认",
+      String(item.qty),
+      String(item.unitPrice || ""),
+      String(item.unitPrice * item.qty || ""),
+      productLink(p),
+    ]);
   });
   const csv = `\uFEFF${rows.map((row) => row.map(csvCell).join(",")).join("\r\n")}`;
   const link = document.createElement("a");
-  link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  link.href = URL.createObjectURL(
+    new Blob([csv], { type: "text/csv;charset=utf-8" }),
+  );
   link.download = `${plan.name.replace(/[\\/:*?"<>|]/g, "-")}.csv`;
   link.click();
   URL.revokeObjectURL(link.href);
@@ -520,9 +551,15 @@ export default function Home() {
           activePlanId,
         }),
       );
-      const current = plans.find((plan) => plan.id === activePlanId) || plans[0];
-      const total = Object.values(current.items).reduce((sum, item) => sum + item.qty * item.unitPrice, 0);
-      window.dispatchEvent(new CustomEvent("home-select-updated", { detail: { total } }));
+      const current =
+        plans.find((plan) => plan.id === activePlanId) || plans[0];
+      const total = Object.values(current.items).reduce(
+        (sum, item) => sum + item.qty * item.unitPrice,
+        0,
+      );
+      window.dispatchEvent(
+        new CustomEvent("home-select-updated", { detail: { total } }),
+      );
     }
   }, [products, plans, activePlanId, hydrated]);
   const activePlan = plans.find((p) => p.id === activePlanId) || plans[0];
@@ -629,7 +666,9 @@ export default function Home() {
           : ids,
     );
   const resetData = () => {
-    if (window.confirm("清空愿望方案并恢复设备候选库？自定义设备也会被清除。")) {
+    if (
+      window.confirm("清空愿望方案并恢复设备候选库？自定义设备也会被清除。")
+    ) {
       setProducts(seedProducts);
       setPlans(initialPlans);
       setActivePlanId("main");
@@ -812,15 +851,26 @@ export default function Home() {
                   <h3>{p.name}</h3>
                   <div className="model">{p.model}</div>
                   <div className="size">
-                    <div><span>产品尺寸</span><b>{p.size}</b></div>
-                    <div><span>安装尺寸 / 预留</span><b>{p.install || "待现场确认"}</b></div>
+                    <div>
+                      <span>产品尺寸</span>
+                      <b>{p.size}</b>
+                    </div>
+                    <div>
+                      <span>安装尺寸 / 预留</span>
+                      <b>{p.install || "待现场确认"}</b>
+                    </div>
                   </div>
                   <div className="features">
                     {p.features.map((f) => (
                       <span key={f}>{f}</span>
                     ))}
                   </div>
-                  <button className="detail-link" onClick={() => setDetailProduct(p)}>查看详情、备注与大图 →</button>
+                  <button
+                    className="detail-link"
+                    onClick={() => setDetailProduct(p)}
+                  >
+                    查看详情、备注与大图 →
+                  </button>
                   <div className="card-foot">
                     <label className="compare-check">
                       <input
@@ -830,13 +880,14 @@ export default function Home() {
                       />{" "}
                       对比
                     </label>
-                    <div>
-                    <small>你的价格</small>
-                    <strong>{money(p.price)}</strong>
-                    <em>
-                      淘宝参考 {p.taobaoPrice ? money(p.taobaoPrice) : "未查到"}
-                    </em>
-                    {p.taobaoNote && <i>{p.taobaoNote}</i>}
+                    <div className="price-stack">
+                      <small>你的价格</small>
+                      <strong>{money(p.price)}</strong>
+                      <em>
+                        淘宝参考{" "}
+                        {p.taobaoPrice ? money(p.taobaoPrice) : "未查到"}
+                      </em>
+                      {p.taobaoNote && <i>{p.taobaoNote}</i>}
                     </div>
                     <button onClick={() => addToPlan(p.id)}>
                       {activePlan.items[p.id] ? "再加一件" : "加入方案"}
@@ -868,7 +919,12 @@ export default function Home() {
               if (!p) return null;
               return (
                 <div className="quote-item" key={id}>
-                  <img src={optimizedImage(p.image)} alt="" loading="lazy" decoding="async" />
+                  <img
+                    src={optimizedImage(p.image)}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                  />
                   <div className="qi-main">
                     <b>{p.name}</b>
                     <span>{p.model}</span>
@@ -1023,7 +1079,12 @@ export default function Home() {
               <b>项目</b>
               {compareProducts.map((p) => (
                 <div key={p.id}>
-                  <img src={optimizedImage(p.image)} alt="" loading="lazy" decoding="async" />
+                  <img
+                    src={optimizedImage(p.image)}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                  />
                   <strong>
                     {p.brand} {p.name}
                   </strong>
@@ -1067,23 +1128,71 @@ export default function Home() {
         </Modal>
       )}
       {detailProduct && (
-        <Modal title={`${detailProduct.brand} · ${detailProduct.name}`} wide onClose={() => setDetailProduct(null)}>
+        <Modal
+          title={`${detailProduct.brand} · ${detailProduct.name}`}
+          wide
+          onClose={() => setDetailProduct(null)}
+        >
           <div className="product-detail">
-            <div className="product-detail-image"><img src={optimizedImage(detailProduct.image)} alt={`${detailProduct.brand} ${detailProduct.name}`} decoding="async" /></div>
+            <div className="product-detail-image">
+              <img
+                src={optimizedImage(detailProduct.image)}
+                alt={`${detailProduct.brand} ${detailProduct.name}`}
+                decoding="async"
+              />
+            </div>
             <article>
-              <span className="detail-category">{detailProduct.category} · {detailProduct.source}</span>
+              <span className="detail-category">
+                {detailProduct.category} · {detailProduct.source}
+              </span>
               <h3>{detailProduct.model}</h3>
               <dl>
-                <div><dt>产品尺寸</dt><dd>{detailProduct.size}</dd></div>
-                <div><dt>安装尺寸 / 预留</dt><dd>{detailProduct.install || "待现场确认"}</dd></div>
-                <div><dt>你的参考价</dt><dd>{money(detailProduct.price)}</dd></div>
-                <div><dt>淘宝参考价</dt><dd>{detailProduct.taobaoPrice ? money(detailProduct.taobaoPrice) : "未录入"}</dd></div>
+                <div>
+                  <dt>产品尺寸</dt>
+                  <dd>{detailProduct.size}</dd>
+                </div>
+                <div>
+                  <dt>安装尺寸 / 预留</dt>
+                  <dd>{detailProduct.install || "待现场确认"}</dd>
+                </div>
+                <div>
+                  <dt>你的参考价</dt>
+                  <dd>{money(detailProduct.price)}</dd>
+                </div>
+                <div>
+                  <dt>淘宝参考价</dt>
+                  <dd>
+                    {detailProduct.taobaoPrice
+                      ? money(detailProduct.taobaoPrice)
+                      : "未录入"}
+                  </dd>
+                </div>
               </dl>
-              <div className="detail-features">{detailProduct.features.map((feature) => <span key={feature}>{feature}</span>)}</div>
+              <div className="detail-features">
+                {detailProduct.features.map((feature) => (
+                  <span key={feature}>{feature}</span>
+                ))}
+              </div>
               <p>{detailProduct.note || "详细说明待补充。"}</p>
               <div className="detail-actions">
-                <a href={productLink(detailProduct)} target="_blank" rel="noreferrer">{detailProduct.url ? "打开商品 / 购买链接 ↗" : "去淘宝搜索该型号 ↗"}</a>
-                <button className="primary" onClick={() => { addToPlan(detailProduct.id); setDetailProduct(null); }}>加入当前方案</button>
+                <a
+                  href={productLink(detailProduct)}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {detailProduct.url
+                    ? "打开商品 / 购买链接 ↗"
+                    : "去淘宝搜索该型号 ↗"}
+                </a>
+                <button
+                  className="primary"
+                  onClick={() => {
+                    addToPlan(detailProduct.id);
+                    setDetailProduct(null);
+                  }}
+                >
+                  加入当前方案
+                </button>
               </div>
             </article>
           </div>
@@ -1102,7 +1211,12 @@ export default function Home() {
           />
           <div className="modal-actions">
             <p>价格为当前方案中的可编辑单价；“待询价”项目不计入总额。</p>
-            <div><button onClick={() => exportPlanCsv(activePlan, products)}>导出 CSV（Excel 可打开）</button><button onClick={() => window.print()}>打印 / 另存为 PDF</button></div>
+            <div>
+              <button onClick={() => exportPlanCsv(activePlan, products)}>
+                导出 CSV（Excel 可打开）
+              </button>
+              <button onClick={() => window.print()}>打印 / 另存为 PDF</button>
+            </div>
           </div>
         </Modal>
       )}
