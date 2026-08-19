@@ -68,7 +68,7 @@ const sections: {
     no: "03",
     title: "设计图纸",
     short: "户型、铺贴、厨房与立面",
-    stat: "9 张图纸",
+    stat: "18 张图纸",
   },
   {
     id: "materials",
@@ -95,8 +95,8 @@ const sections: {
     id: "doors",
     no: "07",
     title: "门窗系统",
-    short: "入户门、室内门与洞口",
-    stat: "8 款候选",
+    short: "入户门、室内门、窗型与洞口",
+    stat: "8 门款 · 11 窗型",
   },
   {
     id: "budget",
@@ -273,6 +273,78 @@ const drawings = [
     image: "renovation/drawings/bathroom-option-b.jpg",
     note: "含淋浴区与门洞关系，施工前复核收口",
   },
+  {
+    name: "拆除图",
+    group: "施工图",
+    image: "renovation/drawings/new-world/page-1.webp",
+    note: "原墙体、拆除范围与施工边界；开工前与物业及施工方复核",
+  },
+  {
+    name: "砌筑图",
+    group: "施工图",
+    image: "renovation/drawings/new-world/page-2.webp",
+    note: "新建墙体与门洞定位；需结合现场结构和完成面尺寸确认",
+  },
+  {
+    name: "棚面图",
+    group: "施工图",
+    image: "renovation/drawings/new-world/page-3.webp",
+    note: "吊顶造型、标高与检修关系参考",
+  },
+  {
+    name: "悬浮铝型材位置图",
+    group: "施工图",
+    image: "renovation/drawings/new-world/page-4.webp",
+    note: "悬浮顶铝型材位置与连续收口关系",
+  },
+  {
+    name: "灯位图",
+    group: "机电点位",
+    image: "renovation/drawings/new-world/page-5.webp",
+    note: "灯具定位参考；最终需与家具、吊顶及调光回路统一核对",
+  },
+  {
+    name: "开关图",
+    group: "机电点位",
+    image: "renovation/drawings/new-world/page-6.webp",
+    note: "开关、场景面板与控制关系参考",
+  },
+  {
+    name: "插座位置图",
+    group: "机电点位",
+    image: "renovation/drawings/new-world/page-7.webp",
+    note: "强弱电插座定位；需结合家电安装尺寸和柜体深化复核",
+  },
+  {
+    name: "上下水点位位置图",
+    group: "机电点位",
+    image: "renovation/drawings/new-world/page-8.webp",
+    note: "给排水点位参考；施工前核对设备接口、坡度与检修空间",
+  },
+  {
+    name: "平面布置图",
+    group: "总平面",
+    image: "renovation/drawings/new-world/page-9.webp",
+    note: "家具、柜体与空间动线布置总图",
+  },
+];
+
+const windowReferences = [
+  {
+    name: "窗型尺寸表 · 第 1 页",
+    image: "renovation/windows/window-schedule-1.webp",
+    note: "C001 / C002 / C005 / C006 / C007 / C008；90/90 方压线系列",
+  },
+  {
+    name: "窗型尺寸表 · 第 2 页",
+    image: "renovation/windows/window-schedule-2.webp",
+    note: "C009 / C010 / C011；含 4620 × 1980 mm 大窗组合",
+  },
+  {
+    name: "窗户现场样图",
+    image: "renovation/windows/window-sample.webp",
+    note: "星空灰窄框样窗与侧开启扇效果参考；颜色以现场光线和实物封样为准",
+  },
 ];
 
 const tileCandidates: Candidate[] = [
@@ -339,6 +411,12 @@ const documents = [
   ],
   ["厨房图纸", "PDF", "docs/厨房图纸.pdf", "厨房立面、尺寸与隐藏砖核对"],
   ["原始设计资料", "PDF", "docs/原始设计资料.pdf", "项目原始设计资料归档"],
+  [
+    "新世界户型施工图 · 9 页",
+    "PDF",
+    "docs/新世界_户型图_A4单页.pdf",
+    "拆除、砌筑、棚面、灯位、开关、插座、上下水与平面布置",
+  ],
 ];
 
 const money = (value: number) =>
@@ -463,7 +541,7 @@ export default function PortalApp() {
   return (
     <main className="yj-app">
       <Topbar section={section} />
-      {section === "home" && <HomePage />}
+      {section === "home" && <HomePage rows={quoteRows} />}
       {section === "smart" && <SmartChoicePage />}
       {section === "appliances" && (
         <div className="yj-appliance-wrap">
@@ -576,6 +654,9 @@ function Topbar({ section }: { section: Section }) {
         </div>
       </a>
       <nav>
+        <a className={section === "home" ? "active" : ""} href="#home">
+          首页
+        </a>
         {sections.map((item) => (
           <a
             className={section === item.id ? "active" : ""}
@@ -654,54 +735,233 @@ function PageHead({
   );
 }
 
-function HomePage() {
+const dashboardColors = [
+  "#274b3c",
+  "#a46f45",
+  "#71816f",
+  "#c8a97e",
+  "#5f706b",
+  "#8c6b59",
+  "#b7b2a5",
+];
+
+function HomePage({ rows }: { rows: QuoteRow[] }) {
+  const [progress, setProgress] = useState(0);
+  const [budget, setBudget] = useState({
+    total: 0,
+    count: 0,
+    missing: 0,
+    categories: [] as { name: string; value: number }[],
+  });
+  useEffect(() => {
+    const sync = () => {
+      try {
+        const manual = JSON.parse(
+          localStorage.getItem("yj-manual-budget-v2") || "[]",
+        ) as QuoteRow[];
+        const overrides = JSON.parse(
+          localStorage.getItem("yj-budget-overrides-v2") || "{}",
+        ) as Record<string, number>;
+        const included = JSON.parse(
+          localStorage.getItem("yj-budget-included-v2") || "{}",
+        ) as Record<string, boolean>;
+        const active = [...rows, ...manual].filter(
+          (row) => included[row.id] !== false,
+        );
+        const grouped = active.reduce<Record<string, number>>((map, row) => {
+          const value = overrides[row.id] ?? row.value ?? 0;
+          map[row.category || "其他"] =
+            (map[row.category || "其他"] || 0) + value;
+          return map;
+        }, {});
+        const ranked = Object.entries(grouped)
+          .map(([name, value]) => ({ name, value }))
+          .sort((a, b) => b.value - a.value);
+        const categories =
+          ranked.length > 6
+            ? [
+                ...ranked.slice(0, 6),
+                {
+                  name: "其他",
+                  value: ranked
+                    .slice(6)
+                    .reduce((sum, item) => sum + item.value, 0),
+                },
+              ]
+            : ranked;
+        setBudget({
+          total: active.reduce(
+            (sum, row) => sum + (overrides[row.id] ?? row.value ?? 0),
+            0,
+          ),
+          count: active.length,
+          missing: active.filter(
+            (row) => !(overrides[row.id] ?? row.value ?? 0),
+          ).length,
+          categories,
+        });
+      } catch {
+        setBudget({ total: 0, count: 0, missing: 0, categories: [] });
+      }
+    };
+    sync();
+    addEventListener("yj-budget-updated", sync);
+    return () => removeEventListener("yj-budget-updated", sync);
+  }, [rows]);
+  useEffect(() => {
+    const saved = Number(localStorage.getItem("yj-project-progress-v1") || 0);
+    setProgress(Math.min(100, Math.max(0, saved)));
+  }, []);
+  const updateProgress = (value: number) => {
+    const next = Math.min(100, Math.max(0, value || 0));
+    setProgress(next);
+    localStorage.setItem("yj-project-progress-v1", String(next));
+  };
+  let cursor = 0;
+  const segments = budget.total
+    ? budget.categories.map((item, index) => {
+        const start = cursor;
+        cursor += (item.value / budget.total) * 100;
+        return `${dashboardColors[index % dashboardColors.length]} ${start}% ${cursor}%`;
+      })
+    : ["#ded9cf 0 100%"];
   return (
     <>
-      <section className="yj-hero">
-        <div>
-          <p className="yj-eyebrow">HOME RENOVATION ARCHIVE · 2026</p>
-          <h1>
-            把一个家的所有选择，
-            <br />
-            <em>放进同一张图里。</em>
-          </h1>
-          <p className="yj-lead">
-            从户型、灯光和全屋智能，到家电、主材、家具、全屋定制与门窗，每一次对比、报价和安装尺寸都在这里持续沉淀。
-          </p>
-          <div className="yj-actions">
-            <a className="primary" href="#design">
-              先看设计图纸
-            </a>
-            <a href="#appliances">打开家电选型台</a>
+      <section className="yj-dashboard">
+        <header className="yj-dashboard-head">
+          <div>
+            <p className="yj-eyebrow">PROJECT COCKPIT · 2026</p>
+            <h1>
+              悦景新世界
+              <br />
+              <em>装修项目驾驶舱</em>
+            </h1>
+            <p>
+              预算、进度、图纸和选型持续汇总；数据保存在本机浏览器，可随时手动调整。
+            </p>
           </div>
-          <dl className="yj-facts">
-            <div>
-              <dt>风格</dt>
-              <dd>暖白 · 克制 · 低眩光</dd>
+          <div className="yj-dashboard-actions">
+            <a href="#budget">打开预算台账</a>
+            <a href="#design">查看全部图纸</a>
+          </div>
+        </header>
+        <section className="yj-metric-grid">
+          <article>
+            <span>目前计入花费</span>
+            <strong>{money(budget.total)}</strong>
+            <small>来自预算台账的已勾选项目</small>
+          </article>
+          <article>
+            <span>当前进度</span>
+            <strong>{progress}%</strong>
+            <small>可在下方手动修改</small>
+          </article>
+          <article>
+            <span>计价项目</span>
+            <strong>{budget.count}</strong>
+            <small>含选型台和手工预算项目</small>
+          </article>
+          <article>
+            <span>待补价格</span>
+            <strong>{budget.missing}</strong>
+            <small>金额为空或为 0 的已计入项目</small>
+          </article>
+        </section>
+        <section className="yj-dashboard-panels">
+          <article className="yj-spend-panel">
+            <header>
+              <span>各项花费</span>
+              <a href="#budget">编辑金额 ↗</a>
+            </header>
+            <div className="yj-spend-chart">
+              <div
+                className="yj-donut"
+                style={{ background: `conic-gradient(${segments.join(",")})` }}
+              >
+                <span>
+                  <b>{money(budget.total)}</b>
+                  <small>当前合计</small>
+                </span>
+              </div>
+              {budget.categories.length ? (
+                <ol>
+                  {budget.categories.map((item, index) => (
+                    <li key={item.name}>
+                      <i
+                        style={{
+                          background:
+                            dashboardColors[index % dashboardColors.length],
+                        }}
+                      />
+                      <span>{item.name}</span>
+                      <b>{money(item.value)}</b>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="yj-chart-empty">预算台账尚未录入金额</p>
+              )}
             </div>
-            <div>
-              <dt>重点</dt>
-              <dd>调光 / 尺寸 / 收口 / 验收</dd>
+          </article>
+          <article className="yj-progress-panel">
+            <header>
+              <span>整体施工进度</span>
+              <small>手动维护</small>
+            </header>
+            <div className="yj-progress-body">
+              <div
+                className="yj-progress-ring"
+                style={{
+                  background: `conic-gradient(var(--green) 0 ${progress}%, #ded9cf ${progress}% 100%)`,
+                }}
+              >
+                <span>
+                  <b>{progress}%</b>
+                  <small>已完成</small>
+                </span>
+              </div>
+              <div className="yj-progress-editor">
+                <label htmlFor="project-progress">拖动更新目前进度</label>
+                <input
+                  id="project-progress"
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={progress}
+                  onChange={(event) =>
+                    updateProgress(Number(event.target.value))
+                  }
+                />
+                <div>
+                  <input
+                    type="number"
+                    min="0"
+                    max="100"
+                    value={progress}
+                    onChange={(event) =>
+                      updateProgress(Number(event.target.value))
+                    }
+                  />
+                  <span>%</span>
+                </div>
+                <p>进度仅用于项目总览，不会修改预算金额。</p>
+              </div>
             </div>
+          </article>
+          <a className="yj-dashboard-plan" href="#design">
+            <img
+              src="renovation/drawings/floor-plan-color.webp"
+              alt="悦景新世界彩色家具布置图"
+              decoding="async"
+              fetchPriority="high"
+            />
             <div>
-              <dt>存储</dt>
-              <dd>本机浏览器 · 可离线</dd>
+              <span>MASTER PLAN</span>
+              <b>悦景新世界 20-1-19-1</b>
+              <small>总平面 · 17638 × 12468 mm · 18 张图纸</small>
             </div>
-          </dl>
-        </div>
-        <figure className="yj-plan-card">
-          <img
-            src="renovation/drawings/floor-plan-color.webp"
-            alt="悦景新世界彩色家具布置图"
-            decoding="async"
-            fetchPriority="high"
-          />
-          <figcaption>
-            <span>MASTER PLAN</span>
-            <b>悦景新世界 20-1-19-1</b>
-            <small>总平面 · 17638 × 12468 mm</small>
-          </figcaption>
-        </figure>
+          </a>
+        </section>
       </section>
       <section className="yj-section yj-index">
         <div className="yj-section-title">
@@ -950,7 +1210,15 @@ function SmartPage() {
 
 function DesignPage() {
   const [active, setActive] = useState<(typeof drawings)[number] | null>(null);
-  const groups = ["全部", "总平面", "地面铺贴", "厨房", "卫生间"];
+  const groups = [
+    "全部",
+    "总平面",
+    "施工图",
+    "机电点位",
+    "地面铺贴",
+    "厨房",
+    "卫生间",
+  ];
   const [group, setGroup] = useState("全部");
   const list =
     group === "全部"
@@ -1415,6 +1683,9 @@ function DoorsPage({
   prices: Record<string, number>;
   setPrice: (id: string, price: number) => void;
 }) {
+  const [windowDetail, setWindowDetail] = useState<
+    (typeof windowReferences)[number] | null
+  >(null);
   return (
     <div className="yj-page">
       <PageHead
@@ -1458,6 +1729,45 @@ function DoorsPage({
           />
         ))}
       </section>
+      <section className="yj-window-section">
+        <div className="yj-section-title">
+          <p>WINDOW SCHEDULE</p>
+          <h2>窗型图与现场样窗</h2>
+          <span>
+            点击图片可放大查看窗号、开启方式和尺寸；最终生产尺寸必须以厂家复尺单为准。
+          </span>
+        </div>
+        <div className="yj-window-grid">
+          {windowReferences.map((item) => (
+            <button key={item.name} onClick={() => setWindowDetail(item)}>
+              <img
+                src={item.image}
+                alt={item.name}
+                loading="lazy"
+                decoding="async"
+              />
+              <div>
+                <b>{item.name}</b>
+                <span>{item.note}</span>
+              </div>
+            </button>
+          ))}
+        </div>
+      </section>
+      {windowDetail && (
+        <div className="yj-lightbox" onClick={() => setWindowDetail(null)}>
+          <button onClick={() => setWindowDetail(null)}>关闭 ×</button>
+          <img
+            src={windowDetail.image}
+            alt={windowDetail.name}
+            decoding="async"
+          />
+          <footer>
+            <b>{windowDetail.name}</b>
+            <span>{windowDetail.note}</span>
+          </footer>
+        </div>
+      )}
     </div>
   );
 }
@@ -1488,16 +1798,20 @@ function BudgetPage({ rows }: { rows: QuoteRow[] }) {
     .reduce((sum, row) => sum + valueOf(row), 0);
   const persist = (key: string, value: unknown) =>
     localStorage.setItem(key, JSON.stringify(value));
+  const notify = () =>
+    queueMicrotask(() => dispatchEvent(new CustomEvent("yj-budget-updated")));
   const updateValue = (id: string, value: number) =>
     setOverrides((current) => {
       const next = { ...current, [id]: value };
       persist("yj-budget-overrides-v2", next);
+      notify();
       return next;
     });
   const toggle = (id: string) =>
     setIncluded((current) => {
       const next = { ...current, [id]: current[id] === false };
       persist("yj-budget-included-v2", next);
+      notify();
       return next;
     });
   const add = (event: FormEvent<HTMLFormElement>) => {
@@ -1515,12 +1829,14 @@ function BudgetPage({ rows }: { rows: QuoteRow[] }) {
     ];
     setManual(next);
     persist("yj-manual-budget-v2", next);
+    notify();
     setShowForm(false);
   };
   const remove = (id: string) => {
     const next = manual.filter((row) => row.id !== id);
     setManual(next);
     persist("yj-manual-budget-v2", next);
+    notify();
   };
   const exportCsv = () => {
     const body = [

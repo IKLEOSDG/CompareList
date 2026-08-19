@@ -12,11 +12,10 @@ await mkdir(cloudflareOutput, { recursive: true });
 await cp(viteOutput, cloudflareOutput, { recursive: true });
 
 // Keep the directly-openable local preview in sync with every production build.
-// Only replace compiled entry files; the existing static asset library stays intact.
+// Vite has no index.html in this mode, so copying the full output preserves the
+// local launcher while adding every newly generated public asset.
 await mkdir(staticPreview, { recursive: true });
-for (const file of ["app.css", "app.js"]) {
-  await cp(resolve(viteOutput, file), resolve(staticPreview, file));
-}
+await cp(viteOutput, staticPreview, { recursive: true });
 
 async function removeOriginalRasterFiles(directory) {
   for (const entry of await readdir(directory, { withFileTypes: true })) {
