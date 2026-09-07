@@ -69,7 +69,7 @@ const sections: {
     no: "03",
     title: "设计图纸",
     short: "户型、铺贴、厨房与立面",
-    stat: "17 张图纸 · 最终版已归档",
+    stat: "8 张最终图 · 已归档",
   },
   {
     id: "materials",
@@ -221,60 +221,6 @@ const doors: Candidate[] = [
 
 const drawings = [
   {
-    name: "彩色家具布置总图",
-    group: "总平面",
-    image: "renovation/drawings/floor-plan-color.jpg",
-    note: "整体尺寸 17638 × 12468 mm；作为空间、设备和门洞定位底图",
-  },
-  {
-    name: "户型与设备点位参考",
-    group: "总平面",
-    image: "renovation/floor-plan.jpg",
-    note: "含全屋智能、家电及家具位置参考",
-  },
-  {
-    name: "厅卧室铺贴方案一",
-    group: "地面铺贴",
-    image: "renovation/drawings/flooring-1.png",
-    note: "长城瓷砖方案；施工前必须现场复尺",
-  },
-  {
-    name: "厅卧室铺贴方案二",
-    group: "地面铺贴",
-    image: "renovation/drawings/flooring-2.png",
-    note: "长城瓷砖方案；重点比较对缝与通铺起点",
-  },
-  {
-    name: "厅卧室铺贴方案三",
-    group: "地面铺贴",
-    image: "renovation/drawings/flooring-3.png",
-    note: "长城瓷砖方案；重点比较走廊与客厅连续性",
-  },
-  {
-    name: "厅卧室铺贴方案四",
-    group: "地面铺贴",
-    image: "renovation/drawings/flooring-4.png",
-    note: "长城瓷砖方案；须结合损耗和窄条位置决定",
-  },
-  {
-    name: "厨房铺贴深化",
-    group: "厨房",
-    image: "renovation/drawings/kitchen-1.png",
-    note: "瓦工施工前需与橱柜厂家核对隐藏砖位置",
-  },
-  {
-    name: "卫生间立面方案 A",
-    group: "卫生间",
-    image: "renovation/drawings/bathroom-option-a.jpg",
-    note: "600×1350 竖向排版参考，最终以现场尺寸为准",
-  },
-  {
-    name: "卫生间立面方案 B",
-    group: "卫生间",
-    image: "renovation/drawings/bathroom-option-b.jpg",
-    note: "含淋浴区与门洞关系，施工前复核收口",
-  },
-  {
     name: "拆除图",
     group: "施工图",
     image: "renovation/drawings/final/page-1.webp",
@@ -398,14 +344,6 @@ const documents = [
     "docs/灯光设计指导.docx",
     "重点空间调光、色温、回路和验收",
   ],
-  [
-    "地面铺贴方案 1–4",
-    "PDF",
-    "docs/地面铺贴方案1-4.pdf",
-    "长城瓷砖厅卧室铺贴排版",
-  ],
-  ["厨房图纸", "PDF", "docs/厨房图纸.pdf", "厨房立面、尺寸与隐藏砖核对"],
-  ["原始设计资料", "PDF", "docs/原始设计资料.pdf", "项目原始设计资料归档"],
   [
     "新世界最终设计图 · 8 页",
     "PDF",
@@ -1785,9 +1723,6 @@ function DesignPage() {
     "总平面",
     "施工图",
     "机电点位",
-    "地面铺贴",
-    "厨房",
-    "卫生间",
   ];
   const [group, setGroup] = useState("全部");
   const list =
@@ -1834,9 +1769,9 @@ function DesignPage() {
         ))}
       </section>
       <div className="yj-drawing-note">
-        <b>施工边界</b>
+        <b>唯一施工版本</b>
         <span>
-          长城铺贴图和卫生间立面均为排版参考，不代替现场复尺、损耗计算、收口节点及最终施工确认。
+          页面仅保留 2026.09 最终定稿。现场仍需结合结构条件、完成面与实测尺寸复核后施工。
         </span>
       </div>
       {active && (
