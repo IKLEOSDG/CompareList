@@ -69,7 +69,7 @@ const sections: {
     no: "03",
     title: "设计图纸",
     short: "户型、铺贴、厨房与立面",
-    stat: "18 张图纸",
+    stat: "17 张图纸 · 最终版已归档",
   },
   {
     id: "materials",
@@ -277,55 +277,49 @@ const drawings = [
   {
     name: "拆除图",
     group: "施工图",
-    image: "renovation/drawings/new-world/page-1.webp",
+    image: "renovation/drawings/final/page-1.webp",
     note: "原墙体、拆除范围与施工边界；开工前与物业及施工方复核",
   },
   {
     name: "砌筑图",
     group: "施工图",
-    image: "renovation/drawings/new-world/page-2.webp",
+    image: "renovation/drawings/final/page-2.webp",
     note: "新建墙体与门洞定位；需结合现场结构和完成面尺寸确认",
   },
   {
     name: "棚面图",
     group: "施工图",
-    image: "renovation/drawings/new-world/page-3.webp",
+    image: "renovation/drawings/final/page-3.webp",
     note: "吊顶造型、标高与检修关系参考",
   },
   {
     name: "悬浮铝型材位置图",
     group: "施工图",
-    image: "renovation/drawings/new-world/page-4.webp",
+    image: "renovation/drawings/final/page-4.webp",
     note: "悬浮顶铝型材位置与连续收口关系",
   },
   {
     name: "灯位图",
     group: "机电点位",
-    image: "renovation/drawings/new-world/page-5.webp",
+    image: "renovation/drawings/final/page-5.webp",
     note: "灯具定位参考；最终需与家具、吊顶及调光回路统一核对",
   },
   {
     name: "开关图",
     group: "机电点位",
-    image: "renovation/drawings/new-world/page-6.webp",
+    image: "renovation/drawings/final/page-6.webp",
     note: "开关、场景面板与控制关系参考",
   },
   {
     name: "插座位置图",
     group: "机电点位",
-    image: "renovation/drawings/new-world/page-7.webp",
+    image: "renovation/drawings/final/page-7.webp",
     note: "强弱电插座定位；需结合家电安装尺寸和柜体深化复核",
-  },
-  {
-    name: "上下水点位位置图",
-    group: "机电点位",
-    image: "renovation/drawings/new-world/page-8.webp",
-    note: "给排水点位参考；施工前核对设备接口、坡度与检修空间",
   },
   {
     name: "平面布置图",
     group: "总平面",
-    image: "renovation/drawings/new-world/page-9.webp",
+    image: "renovation/drawings/final/page-8.webp",
     note: "家具、柜体与空间动线布置总图",
   },
 ];
@@ -413,10 +407,10 @@ const documents = [
   ["厨房图纸", "PDF", "docs/厨房图纸.pdf", "厨房立面、尺寸与隐藏砖核对"],
   ["原始设计资料", "PDF", "docs/原始设计资料.pdf", "项目原始设计资料归档"],
   [
-    "新世界户型施工图 · 9 页",
+    "新世界最终设计图 · 8 页",
     "PDF",
-    "docs/新世界_户型图_A4单页.pdf",
-    "拆除、砌筑、棚面、灯位、开关、插座、上下水与平面布置",
+    "docs/新世界_最终设计图.pdf",
+    "已定稿：拆除、砌筑、棚面、灯位、开关、插座与平面布置",
   ],
 ];
 
@@ -685,7 +679,7 @@ function Topbar({ section }: { section: Section }) {
         <a className={section === "home" ? "active" : ""} href="#home">
           首页
         </a>
-        {sections.map((item) => (
+        {sections.filter((item) => ["design", "appliances", "materials", "documents"].includes(item.id)).map((item) => (
           <a
             className={section === item.id ? "active" : ""}
             key={item.id}
@@ -697,7 +691,7 @@ function Topbar({ section }: { section: Section }) {
       </nav>
       <CloudStatus />
       <a className="yj-quote-link" href="#budget">
-        报价单
+        预算台账
       </a>
     </header>
   );
@@ -810,22 +804,22 @@ const dashboardColors = [
   "#b7b2a5",
 ];
 const defaultPhases = [
-  "拆除 / 砸墙",
-  "砌筑 / 门洞",
-  "水电改造",
-  "中央空调 / 新风",
-  "防水 / 闭水",
-  "瓦工 / 瓷砖",
-  "吊顶 / 墙面",
-  "全屋定制 / 门窗",
-  "设备 / 灯具安装",
-  "家具软装",
-  "调试 / 验收",
-].map((name) => ({ name, status: "未开始", note: "" }));
+  { name: "拆除 / 砸墙", status: "已完成", note: "拆除完成，现场已转入砌筑" },
+  { name: "砌筑 / 门洞", status: "进行中", note: "当前阶段：按最终砌筑图复核墙体与门洞" },
+  { name: "水电改造", status: "未开始", note: "待家电尺寸与点位清单确认" },
+  { name: "中央空调 / 新风", status: "未开始", note: "" },
+  { name: "防水 / 闭水", status: "未开始", note: "" },
+  { name: "瓦工 / 瓷砖", status: "未开始", note: "" },
+  { name: "吊顶 / 墙面", status: "未开始", note: "" },
+  { name: "全屋定制 / 门窗", status: "未开始", note: "" },
+  { name: "设备 / 灯具安装", status: "未开始", note: "" },
+  { name: "家具软装", status: "未开始", note: "" },
+  { name: "调试 / 验收", status: "未开始", note: "" },
+];
 type ProjectPhase = (typeof defaultPhases)[number];
 
 function HomePage({ rows }: { rows: QuoteRow[] }) {
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState(14);
   const [phases, setPhases] = useState<ProjectPhase[]>(defaultPhases);
   const [budget, setBudget] = useState({
     total: 0,
@@ -889,7 +883,8 @@ function HomePage({ rows }: { rows: QuoteRow[] }) {
     return () => removeEventListener("yj-budget-updated", sync);
   }, [rows]);
   useEffect(() => {
-    const saved = Number(localStorage.getItem("yj-project-progress-v1") || 0);
+    const storedProgress = localStorage.getItem("yj-project-progress-v1");
+    const saved = storedProgress === null ? 14 : Number(storedProgress);
     setProgress(Math.min(100, Math.max(0, saved)));
     try {
       const savedPhases = JSON.parse(
@@ -929,31 +924,61 @@ function HomePage({ rows }: { rows: QuoteRow[] }) {
       <section className="yj-dashboard">
         <header className="yj-dashboard-head">
           <div>
-            <p className="yj-eyebrow">PROJECT COCKPIT · 2026</p>
+            <p className="yj-eyebrow">悦景新世界 · 装修现场</p>
             <h1>
-              悦景新世界
+              家，正在慢慢
               <br />
-              <em>装修项目驾驶舱</em>
+              <em>长成想要的样子</em>
             </h1>
             <p>
-              预算、进度、图纸和选型持续汇总；数据保存在本机浏览器，可随时手动调整。
+              设计已经定稿，现场进入砌筑阶段。这里集中记录进度、预算、图纸与每一次选型。
             </p>
           </div>
           <div className="yj-dashboard-actions">
-            <a href="#budget">打开预算台账</a>
-            <a href="#design">查看全部图纸</a>
+            <a href="#design">查看最终图纸</a>
+            <a href="#appliances">继续家电清单</a>
           </div>
         </header>
+        <section className="yj-home-visual" aria-label="奶油原木风设计效果">
+          <picture>
+            <source
+              media="(max-width: 720px)"
+              srcSet="renovation/mood/cream-living-room-2-sm.webp"
+            />
+            <img
+              src="renovation/mood/cream-living-room-2.webp"
+              alt="奶油原木风客厅设计效果图"
+              decoding="async"
+              fetchPriority="high"
+            />
+          </picture>
+          <div className="yj-home-visual-caption">
+            <span>DESIGN DIRECTION</span>
+            <b>奶油原木 · 柔光 · 低饱和</b>
+            <small>以最终效果图作为全屋选材与色温判断基准</small>
+          </div>
+          <div className="yj-now-card">
+            <span>现在进行中</span>
+            <strong>砌筑 / 门洞</strong>
+            <p>按最终砌筑图核对墙体定位、门洞净尺寸与完成面。</p>
+            <a href="#design">打开砌筑图 →</a>
+          </div>
+        </section>
+        <div className="yj-status-strip">
+          <article className="done"><i>✓</i><span>设计图</span><b>已定稿</b></article>
+          <article className="active"><i>02</i><span>现场施工</span><b>砌筑中</b></article>
+          <article><i>…</i><span>家电清单</span><b>统计中</b></article>
+        </div>
         <section className="yj-metric-grid">
           <article>
-            <span>目前计入花费</span>
+            <span>当前预算合计</span>
             <strong>{money(budget.total)}</strong>
-            <small>来自预算台账的已勾选项目</small>
+            <small>仅统计已计入台账的项目</small>
           </article>
           <article>
-            <span>当前进度</span>
+            <span>整体施工进度</span>
             <strong>{progress}%</strong>
-            <small>可在下方手动修改</small>
+            <small>默认按砌筑阶段估算，可手动调整</small>
           </article>
           <article>
             <span>计价项目</span>
@@ -961,7 +986,7 @@ function HomePage({ rows }: { rows: QuoteRow[] }) {
             <small>含选型台和手工预算项目</small>
           </article>
           <article>
-            <span>待补价格</span>
+            <span>价格待补</span>
             <strong>{budget.missing}</strong>
             <small>金额为空或为 0 的已计入项目</small>
           </article>
@@ -1083,25 +1108,28 @@ function HomePage({ rows }: { rows: QuoteRow[] }) {
             </div>
           </article>
           <a className="yj-dashboard-plan" href="#design">
-            <img
-              src="renovation/drawings/floor-plan-color.webp"
-              alt="悦景新世界彩色家具布置图"
-              decoding="async"
-              fetchPriority="high"
-            />
+            <picture>
+              <source media="(max-width: 720px)" srcSet="renovation/mood/cream-living-room-1-sm.webp" />
+              <img
+                src="renovation/mood/cream-living-room-1.webp"
+                alt="奶油原木风客餐厅纵向设计效果图"
+                loading="lazy"
+                decoding="async"
+              />
+            </picture>
             <div>
-              <span>MASTER PLAN</span>
-              <b>悦景新世界 20-1-19-1</b>
-              <small>总平面 · 17638 × 12468 mm · 18 张图纸</small>
+              <span>FINAL DESIGN · 已定稿</span>
+              <b>完整设计图已归档</b>
+              <small>8 页最终施工图 · 点击查看拆除、砌筑、灯位、开关、插座与平面布置</small>
             </div>
           </a>
         </section>
       </section>
       <section className="yj-section yj-index">
         <div className="yj-section-title">
-          <p>PROJECT INDEX</p>
-          <h2>项目分区</h2>
-          <span>每个分区独立管理，最终统一汇总预算</span>
+          <p>ALL RECORDS</p>
+          <h2>家的全部清单</h2>
+          <span>从图纸到家电，各自清楚记录，最后统一汇总预算</span>
         </div>
         <div className="yj-module-grid">
           {sections.map((item) => (
@@ -1119,22 +1147,23 @@ function HomePage({ rows }: { rows: QuoteRow[] }) {
       </section>
       <section className="yj-focus">
         <article>
-          <p>当前设计重点</p>
+          <p>砌筑阶段 · 现场核对</p>
           <h2>
-            四个重点调光区，
+            墙一旦砌好，
             <br />
-            一个统一控制入口。
+            尺寸就不该再靠猜。
           </h2>
           <ul>
-            <li>客厅 / 餐桌 / 主卧 / 书房分路调光</li>
-            <li>卫生间低位夜灯 + 静止存在感应</li>
-            <li>墙面按键优先，断网仍可用基础场景</li>
+            <li>对照最终砌筑图，逐面确认新建与拆除边界</li>
+            <li>复核门洞净宽、净高与地面完成面标高</li>
+            <li>同步锁定冰箱、洗烘、洗碗机等嵌入尺寸</li>
           </ul>
         </article>
         <aside>
-          <span>下一步优先级</span>
-          <h3>先锁定回路、门洞和设备尺寸，再签主材。</h3>
-          <p>补齐逐路灯光表、PoE端口功率、门洞复尺、瓷砖排版和电器安装预留。</p>
+          <span>接下来优先做</span>
+          <h3>先把影响水电的家电，列完整。</h3>
+          <p>优先补齐嵌入式家电的宽深高、插座位置、上下水和散热要求；电视、吸尘器等后置采购可以晚一点决定。</p>
+          <a href="#appliances">继续统计家电清单 →</a>
         </aside>
       </section>
     </>
@@ -1769,9 +1798,13 @@ function DesignPage() {
     <div className="yj-page">
       <PageHead
         eyebrow="DESIGN DRAWINGS"
-        title="设计图纸"
-        lead="图纸直接展示；点击任意图纸可放大查看细节与尺寸。"
+        title="最终设计图"
+        lead="最终方案已归档。现场优先以这套图纸为准，点击任意图纸可放大核对细节与尺寸。"
       />
+      <div className="yj-final-drawing-banner">
+        <div><span>当前版本</span><b>设计已定稿 · 2026.09</b></div>
+        <a href="docs/新世界_最终设计图.pdf" download>下载 8 页完整 PDF</a>
+      </div>
       <div className="yj-filter-row">
         {groups.map((item) => (
           <button

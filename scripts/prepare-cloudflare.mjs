@@ -5,6 +5,7 @@ const projectRoot = resolve(import.meta.dirname, "..");
 const viteOutput = resolve(projectRoot, "static-next");
 const staticPreview = resolve(projectRoot, "static");
 const cloudflareOutput = resolve(projectRoot, "cloudflare-dist");
+const sitesOutput = resolve(projectRoot, "dist");
 const cloudflareConfig = resolve(projectRoot, "cloudflare");
 
 await rm(cloudflareOutput, { recursive: true, force: true });
@@ -40,4 +41,10 @@ for (const file of ["_headers", "robots.txt"]) {
   await cp(resolve(cloudflareConfig, file), resolve(cloudflareOutput, file));
 }
 
+// Sites uses a conventional static output directory while the existing
+// Cloudflare Pages workflow continues to use cloudflare-dist.
+await rm(sitesOutput, { recursive: true, force: true });
+await cp(cloudflareOutput, sitesOutput, { recursive: true });
+
 console.log(`Cloudflare Pages output ready: ${cloudflareOutput}`);
+console.log(`Sites static output ready: ${sitesOutput}`);
